@@ -5,13 +5,13 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.0</version>
+        <version>4.0.3</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.ducdo</groupId>
     <artifactId>ai-assistant</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>Ai Assistant</name>
+    <name>AI Assistant</name>
     <description>AI Document Q and A for Internal Docs (RAG mini)</description>
     <url/>
     <licenses>
@@ -82,14 +82,15 @@
         </dependency>
 
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+            <version>4.0.1</version>
+            <scope>compile</scope>
         </dependency>
 
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
-            <version>11.3.4</version>
         </dependency>
 
         <dependency>
