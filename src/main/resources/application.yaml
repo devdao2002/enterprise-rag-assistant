@@ -2,9 +2,9 @@ spring:
   application:
     name: RAG mini
   datasource:
-    url: jdbc:postgresql://localhost:5432/ai
-    username: postgres
-    password: password
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
   flyway:
     enabled: true
     locations: classpath:db/migration
