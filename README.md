@@ -206,6 +206,108 @@ Employees have 15 days annual leave.
 Source: DocumentId=480b78ec..., Page=3
 ````
 
+## Run with Docker (Recommended)
+This project is fully containerized using Docker + Docker Compose.
+
+It will start:
+- Spring Boot RAG Application
+- PostgreSQL with pgvector
+- Automatic Flyway migration
+- Persistent database volume
+
+**Prerequisites**
+- Docker installed
+- Docker Compose installed 
+- OpenAI API Key
+
+Check Docker:
+
+````
+docker --version
+docker compose version
+````
+
+**Set OpenAI API Key**
+
+Export your API key:
+````
+export OPENAI_API_KEY=your_api_key_here
+````
+Or create a .env file:
+````
+OPENAI_API_KEY=your_api_key_here
+````
+Docker Compose will automatically load it.
+
+**Start Full Stack**
+````
+docker compose up --build
+````
+**Access Application**
+````
+http://localhost:8080
+````
+**Create Tenant (One-time setup)**
+
+Connect to Postgres:
+````
+docker exec -it rag_postgres psql -U postgres -d ai
+````
+
+Create tenant:
+````
+INSERT INTO tenants (id, name)
+VALUES ('11111111-1111-1111-1111-111111111111', 'CompanyA');
+````
+
+**Upload PDF**
+
+````
+curl -X POST http://localhost:8080/api/documents/upload \
+  -F "file=@./sample.pdf" \
+  -F "tenantId=11111111-1111-1111-1111-111111111111"
+````
+
+**Ask Question**
+
+````
+curl -G http://localhost:8080/api/ask \
+  --data-urlencode "question=How many leave days do employees have?" \
+  --data-urlencode "tenantId=11111111-1111-1111-1111-111111111111"
+````
+
+Expected response:
+
+````
+Employees have 15 days annual leave.
+
+Source: DocumentId=xxxx-xxxx, Page=3
+````
+
+**Stop Containers**
+````
+docker compose down
+````
+
+**Stop and Remove Database Volume**
+
+*This deletes all stored documents and embeddings.*
+
+````
+docker compose down -v
+````
+
+**Inspect Database**
+
+````
+docker exec -it rag_postgres psql -U postgres -d ai
+````
+
+
+
+
+
+
 **Production Enhancements (Future)**
 - WT authentication
 - Role-based document access
