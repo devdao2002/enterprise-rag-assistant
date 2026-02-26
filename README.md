@@ -1,6 +1,16 @@
 # Enterprise Internal AI Document Q&A (RAG)
 An enterprise-grade internal AI assistant built with Spring Boot, PostgreSQL + pgvector, and OpenAI, implementing Retrieval-Augmented Generation (RAG) with citation support.
 
+````
+███████╗██████╗ ███████╗
+██╔════╝██╔══██╗██╔════╝
+█████╗  ██████╔╝███████╗
+██╔══╝  ██╔══██╗╚════██║
+███████╗██║  ██║███████║
+╚══════╝╚═╝  ╚═╝╚══════╝
+
+INTERNAL AI ASSISTANT — ENTERPRISE RAG SYSTEM
+````
 **Features**
 - Upload PDF documents
 
@@ -23,17 +33,38 @@ An enterprise-grade internal AI assistant built with Spring Boot, PostgreSQL + p
 **Architecture**
 
 ````
-User
-↓
-Controller
-↓
-RagService
-↓
-pgvector similarity search
-↓
-OpenAI Chat Completion
-↓
-Response + Citation
+                         ┌──────────────────────┐
+                         │        USER          │
+                         └──────────┬───────────┘
+                                    │
+                                    ▼
+                         ┌──────────────────────┐
+                         │   Spring Boot API    │
+                         │  (RAG Orchestration) │
+                         └──────────┬───────────┘
+                                    │
+               ┌────────────────────┼────────────────────┐
+               ▼                    ▼                    ▼
+      ┌────────────────┐  ┌────────────────┐  ┌────────────────┐
+      │ OpenAI         │  │ PostgreSQL     │  │ Flyway         │
+      │ Embeddings     │  │ + pgvector     │  │ Migration      │
+      └────────────────┘  └────────────────┘  └────────────────┘
+               │                    │
+               ▼                    ▼
+         ┌─────────────────────────────────────┐
+         │  Semantic Search (Top-K Retrieval)  │
+         └─────────────────────────────────────┘
+                                    │
+                                    ▼
+                         ┌──────────────────────┐
+                         │  OpenAI Chat Model   │
+                         │  (Guarded Response)  │
+                         └──────────┬───────────┘
+                                    │
+                                    ▼
+                     ┌────────────────────────────┐
+                     │  Answer + Citation Output  │
+                     └────────────────────────────┘
 ````
 
 **Project Structure**
