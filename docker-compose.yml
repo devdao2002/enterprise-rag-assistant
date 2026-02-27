@@ -1,7 +1,23 @@
 version: "3.9"
 
 services:
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
 
+  ollama-init:
+    image: ollama/ollama
+    depends_on:
+      - ollama
+    entrypoint: >
+      sh -c "
+      sleep 10 &&
+      ollama pull mistral
+      "
   postgres:
     image: ankane/pgvector:latest
     container_name: rag_postgres
@@ -31,3 +47,4 @@ services:
 
 volumes:
   postgres_data:
+  ollama_data:

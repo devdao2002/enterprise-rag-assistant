@@ -9,7 +9,6 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
-
   jpa:
     hibernate:
       ddl-auto: none
@@ -20,6 +19,7 @@ spring:
 
   ai:
     openai:
+#      enabled: false
       api-key: ${OPENAI_API_KEY}
       chat:
         options:
@@ -27,6 +27,19 @@ spring:
       embedding:
         options:
           model: text-embedding-3-small
+    ollama:
+      base-url: http://ollama:11434
+      chat:
+        options:
+          model: mistral
+      embedding:
+        options:
+          model: mxbai-embed-large
 logging:
   level:
     org.springframework.jdbc: DEBUG
+app:
+  llm:
+    provider: ollama   # or ollama | openai
+  embedding:
+    provider: openai

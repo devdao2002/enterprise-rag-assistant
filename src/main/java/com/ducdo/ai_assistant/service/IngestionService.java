@@ -1,5 +1,6 @@
 package com.ducdo.ai_assistant.service;
 
+import com.ducdo.ai_assistant.embedding.EmbeddingProvider;
 import com.ducdo.ai_assistant.model.Document;
 import com.ducdo.ai_assistant.model.Tenant;
 import com.ducdo.ai_assistant.repository.DocumentChunkRepository;
@@ -20,17 +21,17 @@ import java.util.UUID;
 @Service
 public class IngestionService {
 
-    private final EmbeddingModel embeddingModel;
+    private final EmbeddingProvider embeddingProvider;
     private final TenantRepository tenantRepository;
     private final DocumentRepository documentRepository;
     private final DocumentChunkRepository chunkRepository;
 
-    public IngestionService(EmbeddingModel embeddingModel,
+    public IngestionService(EmbeddingProvider embeddingProvider,
                             TenantRepository tenantRepository,
                             DocumentRepository documentRepository,
                             DocumentChunkRepository chunkRepository) {
 
-        this.embeddingModel = embeddingModel;
+        this.embeddingProvider = embeddingProvider;
         this.tenantRepository = tenantRepository;
         this.documentRepository = documentRepository;
         this.chunkRepository = chunkRepository;
@@ -76,7 +77,7 @@ public class IngestionService {
                 for (String chunk : chunks) {
 
                     // 4️⃣ Generate embedding
-                    float[] embedding = embeddingModel.embed(chunk);
+                    float[] embedding = embeddingProvider.embed(chunk);
                     String pgVector = VectorUtils.toPgVector(embedding);
 
                     // 5️⃣ Native insert
