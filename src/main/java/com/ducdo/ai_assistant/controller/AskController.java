@@ -2,6 +2,7 @@ package com.ducdo.ai_assistant.controller;
 
 import com.ducdo.ai_assistant.service.RagService;
 import com.ducdo.ai_assistant.service.RateLimitService;
+import com.ducdo.ai_assistant.service.RateLimitType;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,7 +28,7 @@ public class AskController {
                       HttpServletRequest request) {
         String ip = extractClientIp(request);
 
-        if (!rateLimitService.tryConsume(ip)) {
+        if (!rateLimitService.tryConsume(ip, RateLimitType.ASK)) {
             return ResponseEntity
                     .status(429)
                     .body("Too many requests. Please try again later.");

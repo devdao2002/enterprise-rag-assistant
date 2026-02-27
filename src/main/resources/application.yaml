@@ -27,6 +27,10 @@ spring:
       embedding:
         options:
           model: text-embedding-3-small
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
 logging:
   level:
     org.springframework.jdbc: DEBUG
