@@ -38,6 +38,9 @@ app:
   demo:
     auto-cleanup-enabled: true
     cleanup-interval-hours: 4
+  rate-limit:
+    ask-per-10-minutes: 20
+    upload-per-10-minutes: 2
 
 logging:
   level:

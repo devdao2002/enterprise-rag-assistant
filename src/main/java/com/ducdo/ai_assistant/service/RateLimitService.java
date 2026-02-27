@@ -1,5 +1,6 @@
 package com.ducdo.ai_assistant.service;
 
+import com.ducdo.ai_assistant.config.RateLimitProperties;
 import io.github.bucket4j.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,30 +16,32 @@ public class RateLimitService {
     private static final Logger log =
             LoggerFactory.getLogger(RateLimitService.class);
 
-    // Key format: ip + type
+    private final RateLimitProperties properties;
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+
+    public RateLimitService(RateLimitProperties properties) {
+        this.properties = properties;
+    }
 
     private Bucket createBucket(RateLimitType type) {
 
-        Bandwidth limit;
+        int limit;
 
         switch (type) {
-
-            case ASK -> limit = Bandwidth.classic(
-                    20,
-                    Refill.intervally(20, Duration.ofMinutes(10))
-            );
-
-            case UPLOAD -> limit = Bandwidth.classic(
-                    2,
-                    Refill.intervally(2, Duration.ofMinutes(10))
-            );
-
+            case ASK -> limit = properties.getAskPer10Minutes();
+            case UPLOAD -> limit = properties.getUploadPer10Minutes();
             default -> throw new IllegalArgumentException("Unknown type");
         }
 
+        log.info("Creating bucket for type={} limit={}", type, limit);
+
+        Bandwidth bandwidth = Bandwidth.classic(
+                limit,
+                Refill.intervally(limit, Duration.ofMinutes(10))
+        );
+
         return Bucket.builder()
-                .addLimit(limit)
+                .addLimit(bandwidth)
                 .build();
     }
 
@@ -46,10 +49,7 @@ public class RateLimitService {
 
         String key = ip + ":" + type.name();
 
-        Bucket bucket = buckets.computeIfAbsent(key, k -> {
-            log.info("Creating bucket for key={}", key);
-            return createBucket(type);
-        });
+        Bucket bucket = buckets.computeIfAbsent(key, k -> createBucket(type));
 
         boolean consumed = bucket.tryConsume(1);
 
