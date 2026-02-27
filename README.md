@@ -14,7 +14,7 @@ INTERNAL AI ASSISTANT — ENTERPRISE RAG SYSTEM
 
 ![Demo Status](https://img.shields.io/badge/Demo-Live-green)
 
-> You can try the live demo version **(v0.0.1)** here: **http://98.93.245.218:8080/index.html**
+> You can try the live demo version **(v0.0.1)** here: **https://lynorai.space/index.html**
 
 **Features**
 - Upload PDF documents
