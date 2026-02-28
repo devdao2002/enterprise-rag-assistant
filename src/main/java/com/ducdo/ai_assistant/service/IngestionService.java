@@ -4,51 +4,75 @@ import com.ducdo.ai_assistant.model.Document;
 import com.ducdo.ai_assistant.repository.DocumentChunkRepository;
 import com.ducdo.ai_assistant.repository.DocumentRepository;
 import com.ducdo.ai_assistant.util.TextChunker;
-import com.ducdo.ai_assistant.util.VectorUtils;
+import com.ducdo.ai_assistant.model.DocumentChunk;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class IngestionService {
 
     private final EmbeddingModel embeddingModel;
     private final DocumentRepository documentRepository;
     private final DocumentChunkRepository chunkRepository;
 
-    public IngestionService(EmbeddingModel embeddingModel,
-                            DocumentRepository documentRepository,
-                            DocumentChunkRepository chunkRepository) {
+    private static final int CHUNK_SIZE = 1000;
+    private static final int CHUNK_OVERLAP = 200;
+    private static final int EMBEDDING_BATCH_SIZE = 50;
 
-        this.embeddingModel = embeddingModel;
-        this.documentRepository = documentRepository;
-        this.chunkRepository = chunkRepository;
-    }
+    /**
+     * Create document record and return immediately
+     */
+    public UUID createDocument(MultipartFile file, UUID tenantId) {
 
-    public void ingestPdf(MultipartFile file, UUID tenantId) throws Exception {
-
-        // Create document record (NO Tenant entity anymore)
-        Document document = new Document();
-        document.setId(UUID.randomUUID());
-        document.setTenantId(tenantId);
-        document.setName(file.getOriginalFilename());
-        document.setFileType("PDF");
-        document.setFileSize(file.getSize());
-        document.setStatus("PROCESSING");
+        Document document = Document.builder()
+                .id(UUID.randomUUID())
+                .tenantId(tenantId)
+                .name(file.getOriginalFilename())
+                .fileType("PDF")
+                .fileSize(file.getSize())
+                .status("PROCESSING")
+                .createdAt(LocalDateTime.now())
+                .build();
 
         documentRepository.save(document);
 
-        // Extract text from PDF
-        try (InputStream is = file.getInputStream();
-             PDDocument pdf = PDDocument.load(is)) {
+        return document.getId();
+    }
+
+    /**
+     * Async ingestion (non-blocking)
+     */
+    @Async("ingestionExecutor")
+    @Transactional
+    public void ingestPdfAsync(byte[] fileBytes,
+                               UUID tenantId,
+                               UUID documentId) {
+
+        long start = System.currentTimeMillis();
+
+        try (PDDocument pdf =
+                     PDDocument.load(new ByteArrayInputStream(fileBytes))) {
 
             PDFTextStripper stripper = new PDFTextStripper();
+
+            List<String> allChunks = new ArrayList<>();
 
             int totalPages = pdf.getNumberOfPages();
 
@@ -59,36 +83,61 @@ public class IngestionService {
 
                 String pageText = stripper.getText(pdf);
 
-                // Chunk with overlap
                 List<String> chunks =
-                        TextChunker.chunkText(pageText, 1000, 200);
+                        TextChunker.chunkText(pageText,
+                                CHUNK_SIZE,
+                                CHUNK_OVERLAP);
 
-                int chunkIndex = 0;
-
-                for (String chunk : chunks) {
-
-                    // Generate embedding
-                    float[] embedding = embeddingModel.embed(chunk);
-                    String pgVector = VectorUtils.toPgVector(embedding);
-
-                    // Insert chunk
-                    chunkRepository.insertChunk(
-                            UUID.randomUUID(),
-                            document.getId(),
-                            tenantId,
-                            chunk,
-                            chunkIndex,
-                            page,
-                            chunk.length(),
-                            pgVector
-                    );
-
-                    chunkIndex++;
-                }
+                allChunks.addAll(chunks);
             }
-        }
 
-        document.setStatus("PROCESSED");
-        documentRepository.save(document);
+            log.info("Total chunks generated: {}", allChunks.size());
+
+            // =========================
+            // Batch Embedding + Insert
+            // =========================
+            for (int i = 0; i < allChunks.size(); i += EMBEDDING_BATCH_SIZE) {
+
+                int end = Math.min(i + EMBEDDING_BATCH_SIZE, allChunks.size());
+
+                List<String> batch = allChunks.subList(i, end);
+
+                // 🔥 Batch embedding call
+                List<float[]> embeddings = embeddingModel.embed(batch);
+
+                List<DocumentChunk> entities = new ArrayList<>();
+
+                for (int j = 0; j < batch.size(); j++) {
+
+                    entities.add(
+                            DocumentChunk.builder()
+                                    .id(UUID.randomUUID())
+                                    .documentId(documentId)
+                                    .tenantId(tenantId)
+                                    .content(batch.get(j))
+                                    .chunkIndex(i + j)
+                                    .embedding(embeddings.get(j))
+                                    .createdAt(LocalDateTime.now())
+                                    .build()
+                    );
+                }
+
+                // 🔥 Batch insert
+                chunkRepository.saveAll(entities);
+
+                log.info("Inserted batch {} - {}", i, end);
+            }
+
+            documentRepository.updateStatus(documentId, "READY");
+
+            long duration = System.currentTimeMillis() - start;
+
+            log.info("Ingestion completed in {} ms", duration);
+
+        } catch (Exception e) {
+
+            log.error("Ingestion failed", e);
+            documentRepository.updateStatus(documentId, "FAILED");
+        }
     }
 }

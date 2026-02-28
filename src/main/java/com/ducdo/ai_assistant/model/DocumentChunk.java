@@ -18,9 +18,8 @@ public class DocumentChunk {
     @Id
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "document_id", nullable = false)
-    private Document document;
+    @Column(name = "document_id", nullable = false)
+    private UUID documentId;
 
     @Column(name = "tenant_id", nullable = false)
     private UUID tenantId;
@@ -38,8 +37,8 @@ public class DocumentChunk {
     private Integer tokenCount;
 
     /**
-     * ⚠️ Không để Hibernate cố map vector khi select
-     * Dùng native query để insert và search
+     * ⚠️ Do not let Hibernate attempt to map the vector when selecting.
+     * Use native queries for insert and search operations.
      */
     @Column(columnDefinition = "vector(1536)")
     private float[] embedding;

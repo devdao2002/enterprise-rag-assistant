@@ -146,6 +146,7 @@
 <script>
 
     let sandboxExpiresAt = null;
+    let hasUploadedDocument = false;
 
     async function initSandbox() {
 
@@ -154,23 +155,21 @@
         if (token) {
 
             const res = await fetch("/api/sandbox/validate", {
-                headers: {
-                    "X-Sandbox-Token": token
-                }
+                headers: { "X-Sandbox-Token": token }
             });
 
             if (res.ok) {
                 const data = await res.json();
                 window.sandboxToken = token;
+                sandboxExpiresAt = new Date(data.expiresAt);
                 updateSandboxInfo(token, data.remainingMinutes);
+                startCountdown();
                 return;
             }
 
-            // expired
             localStorage.removeItem("sandboxToken");
         }
 
-        // only here we create new sandbox
         const res = await fetch("/api/sandbox", { method: "POST" });
         const data = await res.json();
 
@@ -179,8 +178,9 @@
         localStorage.setItem("sandboxToken", token);
         window.sandboxToken = token;
 
-        updateSandboxInfo(token, data.remainingMinutes);
         sandboxExpiresAt = new Date(data.expiresAt);
+
+        updateSandboxInfo(token, data.remainingMinutes);
         startCountdown();
     }
 
@@ -188,9 +188,7 @@
 
         document.getElementById("sandboxInfo").innerHTML =
             `<div class="flex flex-col gap-2">
-            <div>
-                <strong>Your private sandbox is active.</strong>
-            </div>
+            <div><strong>Your private sandbox is active.</strong></div>
 
             <div class="text-xs break-all">
                 <span class="font-semibold">Sandbox ID:</span>
@@ -210,6 +208,7 @@
     }
 
     function startCountdown() {
+
         setInterval(() => {
 
             if (!sandboxExpiresAt) return;
@@ -221,6 +220,7 @@
 
             if (diff <= 0) {
                 countdownEl.innerText = "Expired";
+                disableAll();
             } else {
                 countdownEl.innerText = diff;
             }
@@ -228,14 +228,18 @@
         }, 60000);
     }
 
-    function copySandboxId() {
-
-        const id = document.getElementById("sandboxId").innerText;
-
-        navigator.clipboard.writeText(id);
-
-        alert("Sandbox ID copied.");
+    function disableAll() {
+        document.querySelector("button[onclick='uploadFile()']").disabled = true;
+        document.querySelector("button[onclick='askQuestion()']").disabled = true;
     }
+
+    function copySandboxId() {
+        const id = document.getElementById("sandboxId").innerText;
+        navigator.clipboard.writeText(id);
+    }
+
+    let currentDocumentId = null;
+    let pollingInterval = null;
 
     async function uploadFile() {
 
@@ -247,37 +251,87 @@
             return;
         }
 
-        if (file.type !== "application/pdf") {
-            statusEl.innerText = "Only PDF files allowed.";
-            return;
-        }
-
-        if (file.size > 5 * 1024 * 1024) {
-            statusEl.innerText = "File too large (max 5MB).";
-            return;
-        }
-
         const formData = new FormData();
         formData.append("file", file);
 
-        statusEl.innerText = "Uploading...";
+        statusEl.innerHTML = "Uploading...";
 
-        const res = await fetch("/api/documents/upload", {
-            method: "POST",
-            body: formData,
-            headers: {
-                "X-Sandbox-Token": window.sandboxToken
+        try {
+
+            const res = await fetch("/api/documents/upload", {
+                method: "POST",
+                body: formData,
+                headers: {
+                    "X-Sandbox-Token": window.sandboxToken
+                }
+            });
+
+            console.log("Status:", res.status);
+
+            if (!res.ok) {
+                const err = await res.text();
+                statusEl.innerHTML =
+                    `<span class="text-red-600">${err}</span>`;
+                return;
             }
-        });
 
-        const text = await res.text();
+            const data = await res.json();
 
-        if (res.status === 429) {
-            statusEl.innerText = "Upload rate limit exceeded.";
-            return;
+            statusEl.innerHTML =
+                `<span class="text-yellow-600">Processing...</span>`;
+
+            startPollingStatus(data.documentId);
+
+        } catch (e) {
+            statusEl.innerHTML =
+                `<span class="text-red-600">Upload failed.</span>`;
+            console.error(e);
         }
+    }
 
-        statusEl.innerText = text;
+    function startPollingStatus(documentId) {
+
+        pollingInterval = setInterval(async () => {
+
+            const res = await fetch(
+                `/api/documents/status/${documentId}`,
+                {
+                    headers: {
+                        "X-Sandbox-Token": window.sandboxToken
+                    }
+                }
+            );
+
+            if (!res.ok) {
+                clearInterval(pollingInterval);
+                return;
+            }
+
+            const data = await res.json();
+            const statusEl =
+                document.getElementById("uploadStatus");
+
+            if (data.status === "READY") {
+
+                statusEl.innerHTML =
+                    `<span class="text-green-600">
+                    Document ready ✅
+                 </span>`;
+
+                hasUploadedDocument = true;
+                clearInterval(pollingInterval);
+
+            } else if (data.status === "FAILED") {
+
+                statusEl.innerHTML =
+                    `<span class="text-red-600">
+                    Processing failed ❌
+                 </span>`;
+
+                clearInterval(pollingInterval);
+            }
+
+        }, 3000);
     }
 
     async function askQuestion() {
@@ -290,7 +344,14 @@
             return;
         }
 
-        answerEl.innerText = "Thinking...";
+        if (!hasUploadedDocument) {
+            answerEl.innerText =
+                "Please upload a document first.";
+            return;
+        }
+
+        answerEl.innerHTML =
+            `<span class="text-gray-500">Thinking...</span>`;
 
         const res = await fetch(
             `/api/ask?question=${encodeURIComponent(question)}`,
@@ -301,14 +362,20 @@
             }
         );
 
-        const text = await res.text();
-
         if (res.status === 429) {
             answerEl.innerText = "Query rate limit exceeded.";
             return;
         }
 
-        answerEl.innerText = text;
+        if (!res.ok) {
+            answerEl.innerText = "Error processing request.";
+            return;
+        }
+
+        const text = await res.text();
+
+        answerEl.innerHTML =
+            `<div class="whitespace-pre-wrap">${text}</div>`;
     }
 
     window.onload = initSandbox;
