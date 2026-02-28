@@ -37,11 +37,11 @@ public class RagService {
 
         long startTime = System.currentTimeMillis();
 
-        // 1️⃣ Embed question
+        // Embed question
         float[] questionEmbedding = embeddingModel.embed(question);
         String pgVector = VectorUtils.toPgVector(questionEmbedding);
 
-        // 2️⃣ Retrieve top K similar chunks
+        // Retrieve top K similar chunks
         List<ChunkProjection> chunks =
                 chunkRepository.findTopKWithMetadata(tenantId, pgVector, 5);
 
@@ -49,12 +49,12 @@ public class RagService {
             return "I don't have enough information.";
         }
 
-        // 3️⃣ Build context
+        // Build context
         String context = chunks.stream()
                 .map(ChunkProjection::getContent)
                 .collect(Collectors.joining("\n---\n"));
 
-        // 4️⃣ Call LLM
+        // Call LLM
         String answer = chatClient.prompt()
                 .system("""
                         You are an internal enterprise knowledge assistant.
@@ -73,7 +73,7 @@ public class RagService {
                 .call()
                 .content();
 
-        // 5️⃣ Build citation
+        // Build citation
         String citation = chunks.stream()
                 .map(c -> "Source: DocumentId=" + c.getDocumentId()
                         + ", Page=" + c.getPageNumber())
@@ -82,11 +82,12 @@ public class RagService {
 
         String finalResponse = answer + "\n\n" + citation;
 
-        // 6️⃣ Log query
+        // Log query
         long latency = System.currentTimeMillis() - startTime;
 
         QueryLog log = new QueryLog();
         log.setId(UUID.randomUUID());
+        log.setTenantId(tenantId);
         log.setQuestion(question);
         log.setResponse(answer);
         log.setLatencyMs((int) latency);

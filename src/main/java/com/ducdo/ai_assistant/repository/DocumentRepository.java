@@ -10,9 +10,9 @@ import java.util.UUID;
 
 public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
-    List<Document> findByTenant_Id(UUID tenantId);
+    List<Document> findByTenantId(UUID tenantId);
 
-    void deleteByTenant_Id(UUID tenantId);
+    void deleteByTenantId(UUID tenantId);
 
     @Modifying
     @Transactional

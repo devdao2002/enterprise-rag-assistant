@@ -22,9 +22,8 @@ public class DocumentChunk {
     @JoinColumn(name = "document_id", nullable = false)
     private Document document;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "tenant_id", nullable = false)
-    private Tenant tenant;
+    @Column(name = "tenant_id", nullable = false)
+    private UUID tenantId;
 
     @Column(columnDefinition = "TEXT", nullable = false)
     private String content;

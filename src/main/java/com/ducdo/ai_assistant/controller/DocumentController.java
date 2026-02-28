@@ -3,7 +3,10 @@ package com.ducdo.ai_assistant.controller;
 import com.ducdo.ai_assistant.service.IngestionService;
 import com.ducdo.ai_assistant.service.RateLimitService;
 import com.ducdo.ai_assistant.service.RateLimitType;
+import com.ducdo.ai_assistant.service.SandboxService;
+import com.ducdo.ai_assistant.util.SandboxResolver;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -16,16 +19,28 @@ public class DocumentController {
 
     private final IngestionService ingestionService;
     private final RateLimitService rateLimitService;
+    private final SandboxService sandboxService;
+    private final SandboxResolver sandboxResolver;
 
-    public DocumentController(IngestionService ingestionService, RateLimitService rateLimitService) {
+    public DocumentController(IngestionService ingestionService,
+                              RateLimitService rateLimitService,
+                              SandboxService sandboxService ,
+                              SandboxResolver sandboxResolver) {
         this.rateLimitService = rateLimitService;
         this.ingestionService = ingestionService;
+        this.sandboxService = sandboxService;
+        this.sandboxResolver = sandboxResolver;
     }
 
     @PostMapping("/upload")
     public ResponseEntity<String> upload(@RequestParam("file") MultipartFile file,
-                         @RequestParam UUID tenantId,
-                         HttpServletRequest request) throws Exception {
+                                         HttpServletRequest request) throws Exception {
+        UUID tenantId = sandboxResolver.resolve(request);
+
+        if (!sandboxService.isValid(tenantId)) {
+            return ResponseEntity.badRequest()
+                    .body("Sandbox expired.");
+        }
         String ip = extractClientIp(request);
 
         if (!rateLimitService.tryConsume(ip, RateLimitType.UPLOAD)) {

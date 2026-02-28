@@ -3,7 +3,10 @@ package com.ducdo.ai_assistant.controller;
 import com.ducdo.ai_assistant.service.RagService;
 import com.ducdo.ai_assistant.service.RateLimitService;
 import com.ducdo.ai_assistant.service.RateLimitType;
+import com.ducdo.ai_assistant.service.SandboxService;
+import com.ducdo.ai_assistant.util.SandboxResolver;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,17 +18,28 @@ public class AskController {
 
     private final RagService ragService;
     private final RateLimitService rateLimitService;
+    private final SandboxService sandboxService;
+    private final SandboxResolver sandboxResolver;
 
     public AskController(RagService ragService,
-                         RateLimitService rateLimitService) {
+                         RateLimitService rateLimitService,
+                         SandboxService sandboxService ,
+                         SandboxResolver sandboxResolver) {
         this.ragService = ragService;
         this.rateLimitService=rateLimitService;
+        this.sandboxService = sandboxService;
+        this.sandboxResolver = sandboxResolver;
     }
 
     @GetMapping("/ask")
     public ResponseEntity<String> ask(@RequestParam String question,
-                      @RequestParam UUID tenantId,
                       HttpServletRequest request) {
+        UUID tenantId = sandboxResolver.resolve(request);
+
+        if (!sandboxService.isValid(tenantId)) {
+            return ResponseEntity.badRequest()
+                    .body("Sandbox expired.");
+        }
         String ip = extractClientIp(request);
 
         if (!rateLimitService.tryConsume(ip, RateLimitType.ASK)) {

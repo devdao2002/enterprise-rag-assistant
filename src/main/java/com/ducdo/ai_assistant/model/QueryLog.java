@@ -17,9 +17,8 @@ public class QueryLog {
     @Id
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "tenant_id")
-    private Tenant tenant;
+    @Column(name = "tenant_id", nullable = false)
+    private UUID tenantId;
 
     @Column(columnDefinition = "TEXT")
     private String question;

@@ -12,7 +12,7 @@
     <artifactId>ai-assistant</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>AI Assistant</name>
-    <description>AI Document Q and A for Internal Docs (RAG mini)</description>
+    <description>AI Document Q and A for Internal Docs (RAG LynorAI)</description>
     <url/>
     <licenses>
         <license/>

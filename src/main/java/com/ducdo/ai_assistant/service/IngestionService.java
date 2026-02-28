@@ -1,10 +1,8 @@
 package com.ducdo.ai_assistant.service;
 
 import com.ducdo.ai_assistant.model.Document;
-import com.ducdo.ai_assistant.model.Tenant;
 import com.ducdo.ai_assistant.repository.DocumentChunkRepository;
 import com.ducdo.ai_assistant.repository.DocumentRepository;
-import com.ducdo.ai_assistant.repository.TenantRepository;
 import com.ducdo.ai_assistant.util.TextChunker;
 import com.ducdo.ai_assistant.util.VectorUtils;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -21,30 +19,24 @@ import java.util.UUID;
 public class IngestionService {
 
     private final EmbeddingModel embeddingModel;
-    private final TenantRepository tenantRepository;
     private final DocumentRepository documentRepository;
     private final DocumentChunkRepository chunkRepository;
 
     public IngestionService(EmbeddingModel embeddingModel,
-                            TenantRepository tenantRepository,
                             DocumentRepository documentRepository,
                             DocumentChunkRepository chunkRepository) {
 
         this.embeddingModel = embeddingModel;
-        this.tenantRepository = tenantRepository;
         this.documentRepository = documentRepository;
         this.chunkRepository = chunkRepository;
     }
 
     public void ingestPdf(MultipartFile file, UUID tenantId) throws Exception {
 
-        Tenant tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new RuntimeException("Tenant not found"));
-
-        // 1️⃣ Create document record
+        // Create document record (NO Tenant entity anymore)
         Document document = new Document();
         document.setId(UUID.randomUUID());
-        document.setTenant(tenant);
+        document.setTenantId(tenantId);
         document.setName(file.getOriginalFilename());
         document.setFileType("PDF");
         document.setFileSize(file.getSize());
@@ -52,7 +44,7 @@ public class IngestionService {
 
         documentRepository.save(document);
 
-        // 2️⃣ Extract text from PDF
+        // Extract text from PDF
         try (InputStream is = file.getInputStream();
              PDDocument pdf = PDDocument.load(is)) {
 
@@ -67,7 +59,7 @@ public class IngestionService {
 
                 String pageText = stripper.getText(pdf);
 
-                // 3️⃣ Chunk with overlap
+                // Chunk with overlap
                 List<String> chunks =
                         TextChunker.chunkText(pageText, 1000, 200);
 
@@ -75,11 +67,11 @@ public class IngestionService {
 
                 for (String chunk : chunks) {
 
-                    // 4️⃣ Generate embedding
+                    // Generate embedding
                     float[] embedding = embeddingModel.embed(chunk);
                     String pgVector = VectorUtils.toPgVector(embedding);
 
-                    // 5️⃣ Native insert
+                    // Insert chunk
                     chunkRepository.insertChunk(
                             UUID.randomUUID(),
                             document.getId(),

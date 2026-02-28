@@ -8,7 +8,7 @@ import java.util.UUID;
 
 public interface QueryLogRepository extends JpaRepository<QueryLog, UUID> {
 
-    List<QueryLog> findByTenant_IdOrderByCreatedAtDesc(UUID tenantId);
+    List<QueryLog> findByTenantIdOrderByCreatedAtDesc(UUID tenantId);
 
-    long countByTenant_Id(UUID tenantId);
+    long countByTenantId(UUID tenantId);
 }

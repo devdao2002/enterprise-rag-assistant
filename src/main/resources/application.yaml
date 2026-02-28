@@ -1,6 +1,6 @@
 spring:
   application:
-    name: RAG mini
+    name: Lynor AI
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
@@ -31,6 +31,7 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 5MB
+
 # ===============================
 # Demo configuration
 # ===============================

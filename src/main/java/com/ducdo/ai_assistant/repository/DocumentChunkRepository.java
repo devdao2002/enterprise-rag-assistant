@@ -12,7 +12,7 @@ public interface DocumentChunkRepository
         extends JpaRepository<DocumentChunk, UUID> {
 
     // ===============================
-    // 1️⃣ Native insert (vector-safe)
+    // Native insert (vector-safe)
     // ===============================
 
     @Modifying
@@ -39,7 +39,7 @@ public interface DocumentChunkRepository
     );
 
     // =====================================
-    // 2️⃣ Semantic similarity search (RAG)
+    // Semantic similarity search (RAG)
     // =====================================
 
     @Query(value = """
@@ -56,7 +56,7 @@ public interface DocumentChunkRepository
     );
 
     // =====================================
-    // 3️⃣ Similarity search with metadata
+    // Similarity search with metadata
     // =====================================
 
     @Query(value = """
@@ -75,7 +75,7 @@ public interface DocumentChunkRepository
     );
 
     // =====================================
-    // 4️⃣ Delete by document
+    // Delete by document
     // =====================================
 
     @Modifying
@@ -83,8 +83,8 @@ public interface DocumentChunkRepository
     void deleteByDocument_Id(UUID documentId);
 
     // =====================================
-    // 5️⃣ Count chunks per tenant
+    // Count chunks per tenant
     // =====================================
 
-    long countByTenant_Id(UUID tenantId);
+    long countByTenantId(UUID tenantId);
 }
