@@ -36,38 +36,65 @@ An enterprise-grade internal AI assistant built with Spring Boot, PostgreSQL + p
 **Architecture**
 
 ````
-                         ┌──────────────────────┐
-                         │        USER          │
-                         └──────────┬───────────┘
-                                    │
-                                    ▼
-                         ┌──────────────────────┐
-                         │   Spring Boot API    │
-                         │  (RAG Orchestration) │
-                         └──────────┬───────────┘
-                                    │
-               ┌────────────────────┼────────────────────┐
-               ▼                    ▼                    ▼
-      ┌────────────────┐  ┌────────────────┐  ┌────────────────┐
-      │ OpenAI         │  │ PostgreSQL     │  │ Flyway         │
-      │ Embeddings     │  │ + pgvector     │  │ Migration      │
-      └────────────────┘  └────────────────┘  └────────────────┘
-               │                    │
-               ▼                    ▼
-         ┌─────────────────────────────────────┐
-         │  Semantic Search (Top-K Retrieval)  │
-         └─────────────────────────────────────┘
-                                    │
-                                    ▼
-                         ┌──────────────────────┐
-                         │  OpenAI Chat Model   │
-                         │  (Guarded Response)  │
-                         └──────────┬───────────┘
-                                    │
-                                    ▼
-                     ┌────────────────────────────┐
-                     │  Answer + Citation Output  │
-                     └────────────────────────────┘
+                               ┌──────────────────────────┐
+                               │        END USER          │
+                               │  (Browser / Public Demo) │
+                               └──────────────┬───────────┘
+                                              │
+                                              ▼
+                               ┌──────────────────────────┐
+                               │      Frontend (HTML)     │
+                               │  - Upload PDF            │
+                               │  - Ask Question          │
+                               │  - Sandbox Token (LS)    │
+                               └──────────────┬───────────┘
+                                              │
+                                X-Sandbox-Token Header
+                                              │
+                                              ▼
+                         ┌────────────────────────────────────┐
+                         │        Spring Boot API             │
+                         │  RAG Orchestration Layer           │
+                         │                                    │
+                         │  - AskController                   │
+                         │  - DocumentController              │
+                         │  - SandboxController               │
+                         │  - RateLimitService (Bucket4j)     │
+                         │  - SandboxService (4h lifecycle)   │
+                         └──────────────┬─────────────────────┘
+                                        │
+                    ┌───────────────────┼──────────────────────┐
+                    ▼                   ▼                      ▼
+         ┌────────────────┐   ┌──────────────────┐   ┌────────────────┐
+         │ OpenAI         │   │ PostgreSQL       │   │ Flyway         │
+         │ Embedding API  │   │ + pgvector       │   │ Migration      │
+         └────────────────┘   └──────────────────┘   └────────────────┘
+                    │                   │
+                    ▼                   ▼
+        ┌────────────────────┐   ┌─────────────────────────────┐
+        │ Text Chunking      │   │ document_chunks (vector)    │
+        │ (Overlap Strategy) │   │ sandbox_sessions            │
+        └────────────────────┘   │ documents                   │
+                                 │ query_logs                  │
+                                 └─────────────────────────────┘
+                                        │
+                                        ▼
+                          ┌──────────────────────────────┐
+                          │ Semantic Search (Top-K)      │
+                          │ embedding <-> vector cosine  │
+                          └──────────────┬───────────────┘
+                                         │
+                                         ▼
+                          ┌──────────────────────────────┐
+                          │ OpenAI Chat Model            │
+                          │ Guarded Prompt + Context     │
+                          └──────────────┬───────────────┘
+                                         │
+                                         ▼
+                         ┌──────────────────────────────────┐
+                         │ Answer + Citation + Logging      │
+                         │ (QueryLog persisted)             │
+                         └──────────────────────────────────┘
 ````
 
 **Project Structure**
