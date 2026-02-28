@@ -63,6 +63,7 @@ class RagServiceTest {
         ChunkProjection chunk1 = mock(ChunkProjection.class);
         when(chunk1.getContent()).thenReturn("Java is a programming language.");
         when(chunk1.getDocumentId()).thenReturn(docId1);
+        when(chunk1.getDocumentName()).thenReturn("intro.pdf");
         when(chunk1.getPageNumber()).thenReturn(1);
 
         when(chunkRepository.findTopKWithMetadata(eq(tenantId), anyString(), eq(5)))
@@ -74,7 +75,7 @@ class RagServiceTest {
         String response = ragService.ask("What is Java?", tenantId);
 
         assertThat(response).contains("Java is an OO language.");
-        assertThat(response).contains("Source: DocumentId=" + docId1 + ", Page=1");
+        assertThat(response).contains("intro.pdf (Page 1)");
 
         ArgumentCaptor<QueryLog> logCaptor = ArgumentCaptor.forClass(QueryLog.class);
         verify(queryLogRepository).save(logCaptor.capture());

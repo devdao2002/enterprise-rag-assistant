@@ -87,7 +87,6 @@ class DocumentChunkRepositoryTest {
                 .tenantId(tenantId)
                 .name("test.pdf")
                 .status("COMPLETED")
-                .chunks(List.of())
                 .build();
         documentRepository.save(document);
     }
@@ -140,14 +139,13 @@ class DocumentChunkRepositoryTest {
                 .tenantId(tenantId)
                 .name("other.pdf")
                 .status("COMPLETED")
-                .chunks(List.of())
                 .build();
         documentRepository.save(doc2);
 
         chunkRepository.insertChunk(UUID.randomUUID(), doc2.getId(), tenantId, "Chunk 2", 1, 1, 10, createVector(1.0));
 
         // Act
-        chunkRepository.deleteByDocument_Id(document.getId());
+        chunkRepository.deleteByDocumentId(document.getId());
 
         // Assert
         List<UUID> remainingDocIds = jdbcTemplate.queryForList("SELECT document_id FROM document_chunks", UUID.class);

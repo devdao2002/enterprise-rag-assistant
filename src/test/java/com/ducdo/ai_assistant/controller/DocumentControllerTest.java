@@ -18,7 +18,6 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -32,6 +31,9 @@ class DocumentControllerTest {
 
         @MockitoBean
         private IngestionService ingestionService;
+
+        @MockitoBean
+        private com.ducdo.ai_assistant.repository.DocumentRepository documentRepository;
 
         @MockitoBean
         private RateLimitService rateLimitService;
@@ -48,7 +50,7 @@ class DocumentControllerTest {
                 when(sandboxResolver.resolve(any())).thenReturn(tenantId);
                 when(sandboxService.isValid(tenantId)).thenReturn(true);
                 when(rateLimitService.tryConsume(anyString(), eq(RateLimitType.UPLOAD))).thenReturn(true);
-                doNothing().when(ingestionService).ingestPdf(any(), eq(tenantId));
+                when(ingestionService.createDocument(any(), eq(tenantId))).thenReturn(UUID.randomUUID());
 
                 byte[] pdfHeader = { 0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E }; // %PDF-1.
                 MockMultipartFile file = new MockMultipartFile(
@@ -56,7 +58,9 @@ class DocumentControllerTest {
 
                 mockMvc.perform(multipart("/api/documents/upload").file(file))
                                 .andExpect(status().isOk())
-                                .andExpect(content().string("Document processed successfully."));
+                                .andExpect(content().string(
+                                                org.hamcrest.Matchers.containsString("\"status\":\"PROCESSING\"")))
+                                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"documentId\"")));
         }
 
         @Test
@@ -71,6 +75,7 @@ class DocumentControllerTest {
 
                 mockMvc.perform(multipart("/api/documents/upload").file(file))
                                 .andExpect(status().isBadRequest())
-                                .andExpect(content().string("Invalid PDF file."));
+                                .andExpect(content().string(org.hamcrest.Matchers
+                                                .containsString("\"error\":\"Invalid PDF file..\"")));
         }
 }

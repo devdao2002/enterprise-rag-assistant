@@ -32,35 +32,32 @@ class IngestionServiceTest {
     }
 
     @Test
-    void ingestPdf_shouldSaveDocumentProcessingThenProcessed() throws Exception {
+    void createDocument_shouldSaveDocumentWithProcessingStatus() {
         UUID tenantId = UUID.randomUUID();
-
-        // Note: Real PDF parsing with PDDocument is hard to mock purely in unit tests
-        // without an actual PDF file.
-        // For a true unit test of this method, we test the document status transitions
-        // and verify interactions.
-        // A dummy small PDF mock could be used, or we test exceptions.
-
-        // Since IngestionService requires a valid PDF InputStream for
-        // PDDocument.load(), we will test an invalid PDF
-        // to verify the PROCESSING status is logged before failure.
-
         MockMultipartFile file = new MockMultipartFile(
-                "file", "test.pdf", "application/pdf", "invalid pdf data".getBytes());
+                "file", "test.pdf", "application/pdf", "dummy content".getBytes());
 
-        try {
-            ingestionService.ingestPdf(file, tenantId);
-        } catch (Exception e) {
-            // Expected to fail parsing invalid PDF
-        }
+        UUID docId = ingestionService.createDocument(file, tenantId);
 
         ArgumentCaptor<Document> docCaptor = ArgumentCaptor.forClass(Document.class);
-        // Should only be saved once with PROCESSING because parsing fails
         verify(documentRepository, times(1)).save(docCaptor.capture());
 
         Document savedDoc = docCaptor.getValue();
+        assertThat(savedDoc.getId()).isEqualTo(docId);
         assertThat(savedDoc.getTenantId()).isEqualTo(tenantId);
         assertThat(savedDoc.getName()).isEqualTo("test.pdf");
         assertThat(savedDoc.getStatus()).isEqualTo("PROCESSING");
+    }
+
+    @Test
+    void ingestPdfAsync_shouldFailOnInvalidPdfAndSetStatus() {
+        UUID tenantId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        byte[] invalidPdfBytes = "invalid pdf data".getBytes();
+
+        ingestionService.ingestPdfAsync(invalidPdfBytes, tenantId, documentId);
+
+        verify(documentRepository, times(1)).updateStatus(documentId, "FAILED");
+        verify(chunkRepository, never()).saveAll(any());
     }
 }

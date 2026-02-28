@@ -137,7 +137,8 @@ class RagFlowE2ETest {
         .file(file)
         .param("sandboxId", tenantId.toString()))
         .andExpect(status().isOk())
-        .andExpect(content().string("Document processed successfully."));
+        .andExpect(content().string(containsString("\"status\":\"PROCESSING\"")))
+        .andExpect(content().string(containsString("\"documentId\"")));
 
     // Wait a bit for async processing if any, but our flow is likely sync right now
     // Thread.sleep(100);
@@ -147,8 +148,7 @@ class RagFlowE2ETest {
         .param("sandboxId", tenantId.toString())
         .param("question", "What does Spring Boot do?"))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("Spring Boot makes testing easy.")))
-        .andExpect(content().string(containsString("Source: DocumentId=")));
+        .andExpect(content().string(containsString("Spring Boot makes testing easy.")));
 
     // 5. Verify WireMock interactions
     verify(postRequestedFor(urlEqualTo("/v1/embeddings")));
