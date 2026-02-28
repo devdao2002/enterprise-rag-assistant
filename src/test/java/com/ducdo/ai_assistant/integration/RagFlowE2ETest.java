@@ -1,0 +1,159 @@
+package com.ducdo.ai_assistant.integration;
+
+import com.ducdo.ai_assistant.model.Document;
+import com.ducdo.ai_assistant.repository.ChunkProjection;
+import com.ducdo.ai_assistant.repository.DocumentChunkRepository;
+import com.ducdo.ai_assistant.repository.DocumentRepository;
+import com.ducdo.ai_assistant.repository.QueryLogRepository;
+import com.ducdo.ai_assistant.util.SandboxResolver;
+import com.ducdo.ai_assistant.service.SandboxService;
+import com.github.tomakehurst.wiremock.junit5.WireMockTest;
+import com.github.tomakehurst.wiremock.junit5.WireMockTest;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.io.ByteArrayOutputStream;
+import java.util.List;
+import java.util.UUID;
+
+import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+    "spring.flyway.enabled=false",
+    "spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1",
+    "spring.datasource.driverClassName=org.h2.Driver",
+    "spring.datasource.username=sa",
+    "spring.datasource.password="
+})
+@AutoConfigureMockMvc
+@WireMockTest(httpPort = 8089)
+class RagFlowE2ETest {
+
+  @Autowired
+  private MockMvc mockMvc;
+
+  @MockitoBean
+  private DocumentRepository documentRepository;
+
+  @MockitoBean
+  private DocumentChunkRepository chunkRepository;
+
+  @MockitoBean
+  private QueryLogRepository queryLogRepository;
+
+  @MockitoBean
+  private SandboxService sandboxService;
+
+  @MockitoBean
+  private SandboxResolver sandboxResolver;
+
+  private UUID tenantId;
+
+  @DynamicPropertySource
+  static void configureProperties(DynamicPropertyRegistry registry) {
+    registry.add("spring.ai.openai.base-url", () -> "http://localhost:8089");
+    registry.add("spring.ai.openai.api-key", () -> "test-key");
+  }
+
+  @BeforeEach
+  void setUp() {
+    tenantId = UUID.randomUUID();
+    when(sandboxResolver.resolve(any())).thenReturn(tenantId);
+    when(sandboxService.isValid(any())).thenReturn(true);
+
+    ChunkProjection projection = mock(ChunkProjection.class);
+    when(projection.getContent()).thenReturn("Spring Boot makes testing easy.");
+    when(projection.getDocumentId()).thenReturn(UUID.randomUUID());
+    when(projection.getPageNumber()).thenReturn(1);
+
+    when(chunkRepository.findTopKWithMetadata(any(), any(), anyInt()))
+        .thenReturn(List.of(projection));
+  }
+
+  @Test
+  void completeRagFlow_uploadThenAsk() throws Exception {
+    // 1. Mock OpenAI Embedding API Response
+    stubFor(post(urlEqualTo("/v1/embeddings"))
+        .willReturn(aResponse()
+            .withHeader("Content-Type", "application/json")
+            .withBody("""
+                {
+                  "data": [
+                    {
+                      "embedding": [0.1, 0.2, 0.3]
+                    }
+                  ]
+                }
+                """)));
+
+    // 2. Mock OpenAI Chat API Response
+    stubFor(post(urlEqualTo("/v1/chat/completions"))
+        .willReturn(aResponse()
+            .withHeader("Content-Type", "application/json")
+            .withBody("""
+                {
+                  "choices": [
+                    {
+                      "message": {
+                        "content": "Spring Boot makes testing easy."
+                      }
+                    }
+                  ]
+                }
+                """)));
+
+    // 3. Upload Document
+    PDDocument dummyPdf = new PDDocument();
+    dummyPdf.addPage(new PDPage());
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    dummyPdf.save(baos);
+    dummyPdf.close();
+    byte[] validPdfBytes = baos.toByteArray();
+
+    MockMultipartFile file = new MockMultipartFile(
+        "file", "spring-guide.pdf", MediaType.APPLICATION_PDF_VALUE, validPdfBytes);
+
+    mockMvc.perform(multipart("/api/documents/upload")
+        .file(file)
+        .param("sandboxId", tenantId.toString()))
+        .andExpect(status().isOk())
+        .andExpect(content().string("Document processed successfully."));
+
+    // Wait a bit for async processing if any, but our flow is likely sync right now
+    // Thread.sleep(100);
+
+    // 4. Ask Question
+    mockMvc.perform(get("/api/ask")
+        .param("sandboxId", tenantId.toString())
+        .param("question", "What does Spring Boot do?"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Spring Boot makes testing easy.")))
+        .andExpect(content().string(containsString("Source: DocumentId=")));
+
+    // 5. Verify WireMock interactions
+    verify(postRequestedFor(urlEqualTo("/v1/embeddings")));
+    // Since the prompt uses retrieved documents, and we just ingested one, a chat
+    // completion should trigger
+    verify(postRequestedFor(urlEqualTo("/v1/chat/completions")));
+  }
+}
