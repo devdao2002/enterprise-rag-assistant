@@ -101,15 +101,51 @@ An enterprise-grade internal AI assistant built with Spring Boot, PostgreSQL + p
 
 ````
 ai-assistant/
- ├── controller/
- ├── service/
- │     ├── RagService
- │     ├── IngestionService
- ├── repository/
- ├── model/
- ├── util/
- ├── config/
- └── db/migration/
+├── controller/
+│   ├── AskController.java
+│   ├── DocumentController.java
+│   ├── SandboxController.java
+│
+├── service/
+│   ├── RagService.java
+│   ├── IngestionService.java
+│   ├── SandboxService.java
+│   ├── RateLimitService.java
+│   └── RateLimitType.java
+│
+├── repository/
+│   ├── DocumentRepository.java
+│   ├── DocumentChunkRepository.java
+│   ├── QueryLogRepository.java
+│   └── SandboxRepository.java
+│
+├── model/
+│   ├── Document.java
+│   ├── DocumentChunk.java
+│   ├── QueryLog.java
+│   └── SandboxSession.java
+│
+├── util/
+│   ├── TextChunker.java
+│   ├── VectorUtils.java
+│   └── SandboxResolver.java
+│
+├── config/
+│   ├── OpenAiConfig.java
+│   └── SchedulerConfig.java   (if scheduling enabled)
+│
+├── db/
+│   └── migration/
+│       ├── V1__init_schema.sql
+│       ├── V2__sandbox_sessions.sql
+│       └── V3__remove_legacy_tenant.sql
+│
+├── resources/
+│   ├── application.yml
+│   └── static/
+│       └── index.html
+│
+└── pom.xml
 ````
 
 **Tech Stack** :
