@@ -24,16 +24,14 @@
                     Public Demo Sandbox
                 </p>
 
-                <!-- Built by badge -->
                 <span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-full">
-                Built by Duc Do
-            </span>
+                    Built by Duc Do
+                </span>
             </div>
         </div>
 
-        <!-- Social Links -->
+        <!-- Social -->
         <div class="flex gap-4">
-
             <!-- GitHub -->
             <a href="https://github.com/devdao2002/enterprise-rag-assistant"
                target="_blank"
@@ -61,7 +59,6 @@
                     <path d="M20.4 20.4h-3.6v-5.6c0-1.3 0-3-1.9-3s-2.2 1.5-2.2 2.9v5.7H9.1V9h3.5v1.6h.1c.5-.9 1.6-1.9 3.3-1.9 3.5 0 4.1 2.3 4.1 5.2v6.5zM5.3 7.4c-1.2 0-2.1-1-2.1-2.2S4.1 3 5.3 3s2.1 1 2.1 2.2-1 2.2-2.1 2.2zM7.1 20.4H3.5V9h3.6v11.4zM22.2 0H1.8C.8 0 0 .8 0 1.8v20.4C0 23.2.8 24 1.8 24h20.4c1 0 1.8-.8 1.8-1.8V1.8C24 .8 23.2 0 22.2 0z"/>
                 </svg>
             </a>
-
         </div>
     </div>
 
@@ -95,7 +92,8 @@
                    accept="application/pdf"
                    class="mb-4 w-full"/>
 
-            <button onclick="uploadFile()"
+            <button id="uploadBtn"
+                    onclick="uploadFile()"
                     class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full">
                 Upload PDF
             </button>
@@ -114,7 +112,8 @@
                       class="border p-3 rounded w-full mb-4 flex-1"
                       placeholder="Ask something based on uploaded documents..."></textarea>
 
-            <button onclick="askQuestion()"
+            <button id="askBtn"
+                    onclick="askQuestion()"
                     class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded w-full">
                 Ask AI
             </button>
@@ -125,28 +124,51 @@
         </div>
 
     </div>
+
     <!-- Footer -->
     <footer class="mt-16 border-t pt-6 text-center text-sm text-gray-500">
-        <div class="max-w-6xl mx-auto px-4">
-
-            <p>
-                © <span id="year"></span> Duc Do. All rights reserved.
-            </p>
-
-            <script>
-                document.getElementById("year").innerText =
-                    new Date().getFullYear();
-            </script>
-
-        </div>
+        © <span id="year"></span> Duc Do
     </footer>
 
 </div>
 
 <script>
 
-    let sandboxExpiresAt = null;
-    let hasUploadedDocument = false;
+    document.getElementById("year").innerText = new Date().getFullYear();
+
+    /* ================================
+       SaaS Sandbox State Machine
+    ================================ */
+
+    const appState = {
+        sandbox: {
+            token: null,
+            active: false,
+            remainingSeconds: 0
+        },
+        document: {
+            ready: false
+        }
+    };
+
+    function render() {
+
+        const uploadBtn = document.getElementById("uploadBtn");
+        const askBtn = document.getElementById("askBtn");
+
+        if (!appState.sandbox.active) {
+            uploadBtn.disabled = true;
+            askBtn.disabled = true;
+            return;
+        }
+
+        uploadBtn.disabled = false;
+        askBtn.disabled = !appState.document.ready;
+    }
+
+    /* ================================
+       Sandbox Init
+    ================================ */
 
     async function initSandbox() {
 
@@ -160,10 +182,8 @@
 
             if (res.ok) {
                 const data = await res.json();
-                window.sandboxToken = token;
-                sandboxExpiresAt = new Date(data.expiresAt);
-                updateSandboxInfo(token, data.remainingMinutes);
-                startCountdown();
+                activateSandbox(token, data.remainingMinutes);
+                await restoreDocumentState();
                 return;
             }
 
@@ -176,70 +196,48 @@
         token = data.sandboxToken;
 
         localStorage.setItem("sandboxToken", token);
-        window.sandboxToken = token;
-
-        sandboxExpiresAt = new Date(data.expiresAt);
-
-        updateSandboxInfo(token, data.remainingMinutes);
-        startCountdown();
+        activateSandbox(token, data.remainingMinutes);
     }
 
-    function updateSandboxInfo(token, minutes) {
+    function activateSandbox(token, remainingMinutes) {
+
+        appState.sandbox.token = token;
+        appState.sandbox.active = true;
+        appState.sandbox.remainingSeconds = remainingMinutes * 60;
 
         document.getElementById("sandboxInfo").innerHTML =
-            `<div class="flex flex-col gap-2">
-            <div><strong>Your private sandbox is active.</strong></div>
-
-            <div class="text-xs break-all">
-                <span class="font-semibold">Sandbox ID:</span>
-                <span id="sandboxId" class="font-mono">${token}</span>
-                <button onclick="copySandboxId()"
-                        class="ml-2 text-blue-700 underline text-xs">
-                    Copy
-                </button>
-            </div>
-
-            <div>
-                Expires in:
-                <span id="countdown">${minutes}</span>
-                minutes
-            </div>
-        </div>`;
+            `<strong>Your private sandbox is active.</strong><br/>
+            <div>Sandbox ID: <span class="font-mono text-xs">${token}</span></div>
+            <div>Expires in:
+                <span id="countdown" class="font-mono text-xs text-blue-700">
+                     ${formatTime(appState.sandbox.remainingSeconds)}
+                </span></div>`;
+        startCountdown();
+        render();
     }
 
-    function startCountdown() {
+    /* ================================
+       Restore Document State
+    ================================ */
 
-        setInterval(() => {
+    async function restoreDocumentState() {
 
-            if (!sandboxExpiresAt) return;
+        const res = await fetch("/api/documents/exists", {
+            headers: { "X-Sandbox-Token": appState.sandbox.token }
+        });
 
-            const now = new Date();
-            const diff = Math.floor((sandboxExpiresAt - now) / 60000);
+        if (!res.ok) return;
 
-            const countdownEl = document.getElementById("countdown");
+        const data = await res.json();
 
-            if (diff <= 0) {
-                countdownEl.innerText = "Expired";
-                disableAll();
-            } else {
-                countdownEl.innerText = diff;
-            }
+        appState.document.ready = data.hasDocument;
 
-        }, 60000);
+        render();
     }
 
-    function disableAll() {
-        document.querySelector("button[onclick='uploadFile()']").disabled = true;
-        document.querySelector("button[onclick='askQuestion()']").disabled = true;
-    }
-
-    function copySandboxId() {
-        const id = document.getElementById("sandboxId").innerText;
-        navigator.clipboard.writeText(id);
-    }
-
-    let currentDocumentId = null;
-    let pollingInterval = null;
+    /* ================================
+       Upload Flow
+    ================================ */
 
     async function uploadFile() {
 
@@ -251,90 +249,79 @@
             return;
         }
 
+        if (file.size > 5 * 1024 * 1024) {
+            statusEl.innerText = "File too large (max 5MB).";
+            return;
+        }
+
+        statusEl.innerHTML = `<span class="text-yellow-600">Uploading...</span>`;
+
         const formData = new FormData();
         formData.append("file", file);
 
-        statusEl.innerHTML = "Uploading...";
+        const res = await fetch("/api/documents/upload", {
+            method: "POST",
+            body: formData,
+            headers: { "X-Sandbox-Token": appState.sandbox.token }
+        });
 
-        try {
-
-            const res = await fetch("/api/documents/upload", {
-                method: "POST",
-                body: formData,
-                headers: {
-                    "X-Sandbox-Token": window.sandboxToken
-                }
-            });
-
-            console.log("Status:", res.status);
-
-            if (!res.ok) {
-                const err = await res.text();
-                statusEl.innerHTML =
-                    `<span class="text-red-600">${err}</span>`;
-                return;
-            }
-
-            const data = await res.json();
-
+        if (!res.ok) {
             statusEl.innerHTML =
-                `<span class="text-yellow-600">Processing...</span>`;
-
-            startPollingStatus(data.documentId);
-
-        } catch (e) {
-            statusEl.innerHTML =
-                `<span class="text-red-600">Upload failed.</span>`;
-            console.error(e);
+                `<span class="text-red-600">${await res.text()}</span>`;
+            return;
         }
+
+        const data = await res.json();
+        statusEl.innerHTML =
+            `<span class="text-yellow-600">Processing...</span>`;
+
+        pollStatus(data.documentId);
     }
 
-    function startPollingStatus(documentId) {
+    function pollStatus(documentId) {
 
-        pollingInterval = setInterval(async () => {
+        const interval = setInterval(async () => {
 
-            const res = await fetch(
-                `/api/documents/status/${documentId}`,
-                {
-                    headers: {
-                        "X-Sandbox-Token": window.sandboxToken
-                    }
-                }
-            );
+            const res = await fetch(`/api/documents/status/${documentId}`, {
+                headers: { "X-Sandbox-Token": appState.sandbox.token }
+            });
 
             if (!res.ok) {
-                clearInterval(pollingInterval);
+                clearInterval(interval);
                 return;
             }
 
             const data = await res.json();
-            const statusEl =
-                document.getElementById("uploadStatus");
+            const statusEl = document.getElementById("uploadStatus");
 
             if (data.status === "READY") {
-
                 statusEl.innerHTML =
-                    `<span class="text-green-600">
-                    Document ready ✅
-                 </span>`;
+                    `<span class="text-green-600">Document ready ✅</span>`;
+                appState.document.ready = true;
+                render();
+                clearInterval(interval);
+            }
 
-                hasUploadedDocument = true;
-                clearInterval(pollingInterval);
-
-            } else if (data.status === "FAILED") {
-
+            if (data.status === "FAILED") {
                 statusEl.innerHTML =
-                    `<span class="text-red-600">
-                    Processing failed ❌
-                 </span>`;
-
-                clearInterval(pollingInterval);
+                    `<span class="text-red-600">Processing failed ❌</span>`;
+                clearInterval(interval);
             }
 
         }, 3000);
     }
 
+    /* ================================
+       Ask Flow
+    ================================ */
+
     async function askQuestion() {
+
+        if (!appState.document.ready) {
+            document.getElementById("answer").innerText =
+                "Please upload a document first.";
+            return;
+        }
 
         const question = document.getElementById("question").value;
         const answerEl = document.getElementById("answer");
@@ -344,39 +331,80 @@
             return;
         }
 
-        if (!hasUploadedDocument) {
-            answerEl.innerText =
-                "Please upload a document first.";
-            return;
-        }
-
         answerEl.innerHTML =
             `<span class="text-gray-500">Thinking...</span>`;
 
         const res = await fetch(
             `/api/ask?question=${encodeURIComponent(question)}`,
             {
-                headers: {
-                    "X-Sandbox-Token": window.sandboxToken
-                }
+                headers: { "X-Sandbox-Token": appState.sandbox.token }
             }
         );
-
-        if (res.status === 429) {
-            answerEl.innerText = "Query rate limit exceeded.";
-            return;
-        }
 
         if (!res.ok) {
             answerEl.innerText = "Error processing request.";
             return;
         }
 
-        const text = await res.text();
-
         answerEl.innerHTML =
-            `<div class="whitespace-pre-wrap">${text}</div>`;
+            `<div class="whitespace-pre-wrap">${await res.text()}</div>`;
     }
+
+    function formatTime(seconds) {
+
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+
+        return [
+            hours.toString().padStart(2, '0'),
+            minutes.toString().padStart(2, '0'),
+            secs.toString().padStart(2, '0')
+        ].join(':');
+    }
+
+    function startCountdown() {
+
+        const interval = setInterval(() => {
+
+            if (!appState.sandbox.active) {
+                clearInterval(interval);
+                return;
+            }
+
+            if (appState.sandbox.remainingSeconds <= 0) {
+
+                document.getElementById("countdown").innerText = "00:00:00";
+
+                appState.sandbox.active = false;
+                disableAll();
+
+                clearInterval(interval);
+                return;
+            }
+
+            appState.sandbox.remainingSeconds--;
+
+            document.getElementById("countdown").innerText =
+                formatTime(appState.sandbox.remainingSeconds);
+
+        }, 1000);
+    }
+
+    function disableAll() {
+
+        document
+            .querySelector("button[onclick='uploadFile()']")
+            .disabled = true;
+
+        document
+            .querySelector("button[onclick='askQuestion()']")
+            .disabled = true;
+    }
+
+    /* ================================
+       Boot
+    ================================ */
 
     window.onload = initSandbox;
 

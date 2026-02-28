@@ -33,4 +33,6 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
             @Param("documentId") UUID documentId,
             @Param("status") String status
     );
+
+    boolean existsByTenantIdAndStatus(UUID tenantId, String status);
 }

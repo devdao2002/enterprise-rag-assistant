@@ -108,6 +108,22 @@ public class DocumentController {
         ));
     }
 
+    @GetMapping("/exists")
+    public ResponseEntity<?> hasDocument(HttpServletRequest request) {
+
+        UUID tenantId = sandboxResolver.resolve(request);
+
+        boolean exists =
+                documentRepository.existsByTenantIdAndStatus(
+                        tenantId,
+                        "READY"
+                );
+
+        return ResponseEntity.ok(Map.of(
+                "hasDocument", exists
+        ));
+    }
+
     private String extractClientIp(HttpServletRequest request) {
 
         String header = request.getHeader("X-Forwarded-For");
