@@ -9,82 +9,80 @@ import java.util.List;
 import java.util.UUID;
 
 public interface DocumentChunkRepository
-        extends JpaRepository<DocumentChunk, UUID> {
+                extends JpaRepository<DocumentChunk, UUID> {
 
-    // ===============================
-    // Native insert (vector-safe)
-    // ===============================
+        // ===============================
+        // Native insert (vector-safe)
+        // ===============================
 
-    @Modifying
-    @Transactional
-    @Query(value = """
-        INSERT INTO document_chunks
-        (id, document_id, tenant_id, content, chunk_index,
-         page_number, token_count, embedding, created_at)
-        VALUES
-        (:id, :documentId, :tenantId, :content, :chunkIndex,
-         :pageNumber, :tokenCount,
-         CAST(:embedding AS vector),
-         CURRENT_TIMESTAMP)
-        """, nativeQuery = true)
-    void insertChunk(
-            @Param("id") UUID id,
-            @Param("documentId") UUID documentId,
-            @Param("tenantId") UUID tenantId,
-            @Param("content") String content,
-            @Param("chunkIndex") Integer chunkIndex,
-            @Param("pageNumber") Integer pageNumber,
-            @Param("tokenCount") Integer tokenCount,
-            @Param("embedding") String embedding
-    );
+        @Modifying
+        @Transactional
+        @Query(value = """
+                        INSERT INTO document_chunks
+                        (id, document_id, tenant_id, content, chunk_index,
+                         page_number, token_count, embedding, created_at)
+                        VALUES
+                        (:id, :documentId, :tenantId, :content, :chunkIndex,
+                         :pageNumber, :tokenCount,
+                         CAST(:embedding AS vector),
+                         CURRENT_TIMESTAMP)
+                        """, nativeQuery = true)
+        void insertChunk(
+                        @Param("id") UUID id,
+                        @Param("documentId") UUID documentId,
+                        @Param("tenantId") UUID tenantId,
+                        @Param("content") String content,
+                        @Param("chunkIndex") Integer chunkIndex,
+                        @Param("pageNumber") Integer pageNumber,
+                        @Param("tokenCount") Integer tokenCount,
+                        @Param("embedding") String embedding);
 
-    // =====================================
-    // Semantic similarity search (RAG)
-    // =====================================
+        // =====================================
+        // Semantic similarity search (RAG)
+        // =====================================
 
-    @Query(value = """
-        SELECT content
-        FROM document_chunks
-        WHERE tenant_id = :tenantId
-        ORDER BY embedding <-> CAST(:embedding AS vector)
-        LIMIT :limit
-        """, nativeQuery = true)
-    List<String> findTopKContent(
-            @Param("tenantId") UUID tenantId,
-            @Param("embedding") String embedding,
-            @Param("limit") int limit
-    );
+        @Query(value = """
+                        SELECT content
+                        FROM document_chunks
+                        WHERE tenant_id = :tenantId
+                        ORDER BY embedding <-> CAST(:embedding AS vector)
+                        LIMIT :limit
+                        """, nativeQuery = true)
+        List<String> findTopKContent(
+                        @Param("tenantId") UUID tenantId,
+                        @Param("embedding") String embedding,
+                        @Param("limit") int limit);
 
-    // =====================================
-    // Similarity search with metadata
-    // =====================================
+        // =====================================
+        // Similarity search with metadata
+        // =====================================
 
-    @Query(value = """
-    SELECT content AS content,
-           document_id AS documentId,
-           page_number AS pageNumber
-    FROM document_chunks
-    WHERE tenant_id = :tenantId
-    ORDER BY embedding <-> CAST(:embedding AS vector)
-    LIMIT :limit
-    """, nativeQuery = true)
-    List<ChunkProjection> findTopKWithMetadata(
-            @Param("tenantId") UUID tenantId,
-            @Param("embedding") String embedding,
-            @Param("limit") int limit
-    );
+        @Query(value = """
+                        SELECT content AS content,
+                               document_id AS documentId,
+                               page_number AS pageNumber
+                        FROM document_chunks
+                        WHERE tenant_id = :tenantId
+                        ORDER BY embedding <-> CAST(:embedding AS vector)
+                        LIMIT :limit
+                        """, nativeQuery = true)
+        List<ChunkProjection> findTopKWithMetadata(
+                        @Param("tenantId") UUID tenantId,
+                        @Param("embedding") String embedding,
+                        @Param("limit") int limit);
 
-    // =====================================
-    // Delete by document
-    // =====================================
+        // =====================================
+        // Delete by document
+        // =====================================
 
-    @Modifying
-    @Transactional
-    void deleteByDocument_Id(UUID documentId);
+        @Modifying
+        @Transactional
+        @Query("DELETE FROM DocumentChunk c WHERE c.document.id = :documentId")
+        void deleteByDocument_Id(@Param("documentId") UUID documentId);
 
-    // =====================================
-    // Count chunks per tenant
-    // =====================================
+        // =====================================
+        // Count chunks per tenant
+        // =====================================
 
-    long countByTenantId(UUID tenantId);
+        long countByTenantId(UUID tenantId);
 }
