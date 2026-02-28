@@ -72,9 +72,11 @@ public class IngestionService {
 
             PDFTextStripper stripper = new PDFTextStripper();
 
-            List<String> allChunks = new ArrayList<>();
+            record ChunkData(String content, int pageNumber) {}
 
             int totalPages = pdf.getNumberOfPages();
+
+            List<ChunkData> allChunks = new ArrayList<>();
 
             for (int page = 1; page <= totalPages; page++) {
 
@@ -88,7 +90,9 @@ public class IngestionService {
                                 CHUNK_SIZE,
                                 CHUNK_OVERLAP);
 
-                allChunks.addAll(chunks);
+                for (String chunk : chunks) {
+                    allChunks.add(new ChunkData(chunk, page));
+                }
             }
 
             log.info("Total chunks generated: {}", allChunks.size());
@@ -100,29 +104,35 @@ public class IngestionService {
 
                 int end = Math.min(i + EMBEDDING_BATCH_SIZE, allChunks.size());
 
-                List<String> batch = allChunks.subList(i, end);
+                List<ChunkData> batch = allChunks.subList(i, end);
 
-                // 🔥 Batch embedding call
-                List<float[]> embeddings = embeddingModel.embed(batch);
+                List<String> texts = batch.stream()
+                        .map(ChunkData::content)
+                        .toList();
+
+                List<float[]> embeddings = embeddingModel.embed(texts);
 
                 List<DocumentChunk> entities = new ArrayList<>();
 
                 for (int j = 0; j < batch.size(); j++) {
+
+                    ChunkData chunkData = batch.get(j);
 
                     entities.add(
                             DocumentChunk.builder()
                                     .id(UUID.randomUUID())
                                     .documentId(documentId)
                                     .tenantId(tenantId)
-                                    .content(batch.get(j))
+                                    .content(chunkData.content())
                                     .chunkIndex(i + j)
+                                    .pageNumber(chunkData.pageNumber())   // 🔥 FIX
+                                    .tokenCount(chunkData.content().length())
                                     .embedding(embeddings.get(j))
                                     .createdAt(LocalDateTime.now())
                                     .build()
                     );
                 }
 
-                // 🔥 Batch insert
                 chunkRepository.saveAll(entities);
 
                 log.info("Inserted batch {} - {}", i, end);

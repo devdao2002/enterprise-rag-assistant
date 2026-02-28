@@ -13,9 +13,9 @@ import java.util.UUID;
 public interface DocumentChunkRepository
         extends JpaRepository<DocumentChunk, UUID> {
 
-        // ===============================
-        // Native insert (vector-safe)
-        // ===============================
+        // ============================================
+        // Native Insert (Vector Safe)
+        // ============================================
 
         @Modifying
         @Transactional
@@ -30,18 +30,19 @@ public interface DocumentChunkRepository
          CURRENT_TIMESTAMP)
         """, nativeQuery = true)
         void insertChunk(
-                UUID id,
-                UUID documentId,
-                UUID tenantId,
-                String content,
-                Integer chunkIndex,
-                Integer pageNumber,
-                Integer tokenCount,
-                String embedding);
+                @Param("id") UUID id,
+                @Param("documentId") UUID documentId,
+                @Param("tenantId") UUID tenantId,
+                @Param("content") String content,
+                @Param("chunkIndex") Integer chunkIndex,
+                @Param("pageNumber") Integer pageNumber,
+                @Param("tokenCount") Integer tokenCount,
+                @Param("embedding") String embedding
+        );
 
-        // ===============================
-        // Vector Search (Fast Path)
-        // ===============================
+        // ============================================
+        // Vector Search (Content Only)
+        // ============================================
 
         @Query(value = """
         SELECT content
@@ -51,43 +52,47 @@ public interface DocumentChunkRepository
         LIMIT :limit
         """, nativeQuery = true)
         List<String> findTopKContent(
-                UUID tenantId,
-                String embedding,
-                int limit);
+                @Param("tenantId") UUID tenantId,
+                @Param("embedding") String embedding,
+                @Param("limit") int limit
+        );
 
-        // ===============================
-        // Vector Search with Metadata
-        // ===============================
+        // ============================================
+        // Vector Search with Metadata (JOIN documents)
+        // ============================================
 
         @Query(value = """
-        SELECT content AS content,
-               document_id AS documentId,
-               page_number AS pageNumber
-        FROM document_chunks
-        WHERE tenant_id = :tenantId
-        ORDER BY embedding <-> CAST(:embedding AS vector)
+        SELECT dc.content       AS content,
+               dc.document_id   AS documentId,
+               dc.page_number   AS pageNumber,
+               d.name           AS documentName
+        FROM document_chunks dc
+        JOIN documents d ON dc.document_id = d.id
+        WHERE dc.tenant_id = :tenantId
+        ORDER BY dc.embedding <-> CAST(:embedding AS vector)
         LIMIT :limit
         """, nativeQuery = true)
         List<ChunkProjection> findTopKWithMetadata(
-                UUID tenantId,
-                String embedding,
-                int limit);
+                @Param("tenantId") UUID tenantId,
+                @Param("embedding") String embedding,
+                @Param("limit") int limit
+        );
 
-        // ===============================
-        // Delete by document
-        // ===============================
+        // ============================================
+        // Delete by Document
+        // ============================================
 
         void deleteByDocumentId(UUID documentId);
 
-        // ===============================
-        // Delete by tenant (sandbox cleanup)
-        // ===============================
+        // ============================================
+        // Delete by Tenant (Sandbox Cleanup)
+        // ============================================
 
         void deleteByTenantId(UUID tenantId);
 
-        // ===============================
+        // ============================================
         // Count
-        // ===============================
+        // ============================================
 
         long countByTenantId(UUID tenantId);
 }

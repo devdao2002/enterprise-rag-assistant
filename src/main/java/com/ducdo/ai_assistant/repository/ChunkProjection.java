@@ -5,4 +5,5 @@ public interface ChunkProjection {
     String getContent();
     java.util.UUID getDocumentId();
     Integer getPageNumber();
+    String getDocumentName();
 }
