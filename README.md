@@ -2,14 +2,12 @@
 An enterprise-grade internal AI assistant built with Spring Boot, PostgreSQL + pgvector, and OpenAI, implementing Retrieval-Augmented Generation (RAG) with citation support.
 
 ````
-███████╗██████╗ ███████╗
-██╔════╝██╔══██╗██╔════╝
-█████╗  ██████╔╝███████╗
-██╔══╝  ██╔══██╗╚════██║
-███████╗██║  ██║███████║
-╚══════╝╚═╝  ╚═╝╚══════╝
-
-INTERNAL AI ASSISTANT — ENTERPRISE RAG SYSTEM
+██╗      ██╗   ██╗███╗   ██╗ ██████╗ ██████╗  █████╗ ██╗
+██║       ╚██╗ ██╔╝████╗  ██║██╔═══██╗██╔══██╗██╔══██╗██║
+██║        ╚████╔╝ ██╔██╗ ██║██║   ██║██████╔╝███████║██║
+██║         ╚██╔╝  ██║╚██╗██║██║   ██║██╔══██╗██╔══██║██║
+███████╗     ██║   ██║ ╚████║╚██████╔╝██║  ██║██║  ██║██║
+╚══════╝     ╚═╝   ╚═╝  ╚═══╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝
 ````
 
 ![Demo Status](https://img.shields.io/badge/Demo-Live-green)
