@@ -321,6 +321,7 @@
 
         const question = document.getElementById("question").value;
         const answerEl = document.getElementById("answer");
+        const askBtn = document.getElementById("askBtn");
 
         if (!question.trim()) {
             answerEl.innerText = "Please enter a question.";
@@ -328,6 +329,7 @@
         }
         answerEl.innerHTML =
             `<span class="text-gray-500">Thinking...</span>`;
+        askBtn.disabled=true;
 
         const response = await fetch(
             `/api/ask/stream?question=${encodeURIComponent(question)}`,
@@ -378,6 +380,7 @@
                 }
             }
         }
+        askBtn.disabled=false;
     }
 
     function formatTime(seconds) {
