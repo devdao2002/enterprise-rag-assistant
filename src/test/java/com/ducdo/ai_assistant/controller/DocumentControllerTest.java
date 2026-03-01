@@ -50,7 +50,8 @@ class DocumentControllerTest {
                 when(sandboxResolver.resolve(any())).thenReturn(tenantId);
                 when(sandboxService.isValid(tenantId)).thenReturn(true);
                 when(rateLimitService.tryConsume(anyString(), eq(RateLimitType.UPLOAD))).thenReturn(true);
-                when(ingestionService.createDocument(any(), eq(tenantId))).thenReturn(UUID.randomUUID());
+                when(documentRepository.existsByTenantIdAndFileHash(eq(tenantId), anyString())).thenReturn(false);
+                when(ingestionService.createDocument(any(), eq(tenantId), anyString())).thenReturn(UUID.randomUUID());
 
                 byte[] pdfHeader = { 0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E }; // %PDF-1.
                 MockMultipartFile file = new MockMultipartFile(
@@ -76,6 +77,6 @@ class DocumentControllerTest {
                 mockMvc.perform(multipart("/api/documents/upload").file(file))
                                 .andExpect(status().isBadRequest())
                                 .andExpect(content().string(org.hamcrest.Matchers
-                                                .containsString("\"error\":\"Invalid PDF file..\"")));
+                                                .containsString("\"error\":\"Invalid PDF file.\"")));
         }
 }

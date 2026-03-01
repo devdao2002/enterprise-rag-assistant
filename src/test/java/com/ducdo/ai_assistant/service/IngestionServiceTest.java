@@ -37,7 +37,8 @@ class IngestionServiceTest {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "test.pdf", "application/pdf", "dummy content".getBytes());
 
-        UUID docId = ingestionService.createDocument(file, tenantId);
+        String expectedHash = "abc123hash";
+        UUID docId = ingestionService.createDocument(file, tenantId, expectedHash);
 
         ArgumentCaptor<Document> docCaptor = ArgumentCaptor.forClass(Document.class);
         verify(documentRepository, times(1)).save(docCaptor.capture());
@@ -47,6 +48,7 @@ class IngestionServiceTest {
         assertThat(savedDoc.getTenantId()).isEqualTo(tenantId);
         assertThat(savedDoc.getName()).isEqualTo("test.pdf");
         assertThat(savedDoc.getStatus()).isEqualTo("PROCESSING");
+        assertThat(savedDoc.getFileHash()).isEqualTo(expectedHash);
     }
 
     @Test
