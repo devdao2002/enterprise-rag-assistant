@@ -4,7 +4,7 @@ import com.ducdo.ai_assistant.repository.ChunkProjection;
 import com.ducdo.ai_assistant.repository.DocumentChunkRepository;
 import com.ducdo.ai_assistant.repository.DocumentRepository;
 import com.ducdo.ai_assistant.repository.QueryLogRepository;
-import com.ducdo.ai_assistant.util.SandboxResolver;
+import com.ducdo.ai_assistant.security.resolver.SandboxResolver;
 import com.ducdo.ai_assistant.service.SandboxService;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -83,6 +83,7 @@ class RagFlowE2ETest {
     when(projection.getContent()).thenReturn("Spring Boot makes testing easy.");
     when(projection.getDocumentId()).thenReturn(UUID.randomUUID());
     when(projection.getPageNumber()).thenReturn(1);
+    when(projection.getDocumentName()).thenReturn("spring-guide.pdf");
 
     when(chunkRepository.findTopKWithMetadata(any(), any(), anyInt()))
         .thenReturn(List.of(projection));

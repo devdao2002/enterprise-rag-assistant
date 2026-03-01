@@ -1,12 +1,15 @@
 package com.ducdo.ai_assistant.controller;
 
+import com.ducdo.ai_assistant.security.exception.ErrorResponseWriter;
+import com.ducdo.ai_assistant.security.filter.RateLimitFilter;
+import com.ducdo.ai_assistant.security.filter.SandboxFilter;
 import com.ducdo.ai_assistant.service.IngestionService;
 import com.ducdo.ai_assistant.service.RateLimitService;
-import com.ducdo.ai_assistant.service.RateLimitType;
 import com.ducdo.ai_assistant.service.SandboxService;
-import com.ducdo.ai_assistant.util.SandboxResolver;
+import com.ducdo.ai_assistant.security.resolver.SandboxResolver;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
@@ -24,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(DocumentController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class DocumentControllerTest {
 
         @Autowired
@@ -44,12 +48,21 @@ class DocumentControllerTest {
         @MockitoBean
         private SandboxResolver sandboxResolver;
 
+        // Required for filter bean dependency resolution even with addFilters=false
+        @MockitoBean
+        private SandboxFilter sandboxFilter;
+
+        @MockitoBean
+        private RateLimitFilter rateLimitFilter;
+
+        @MockitoBean
+        private ErrorResponseWriter errorResponseWriter;
+
         @Test
         void upload_validPdf_shouldReturnOk() throws Exception {
                 UUID tenantId = UUID.randomUUID();
                 when(sandboxResolver.resolve(any())).thenReturn(tenantId);
                 when(sandboxService.isValid(tenantId)).thenReturn(true);
-                when(rateLimitService.tryConsume(anyString(), eq(RateLimitType.UPLOAD))).thenReturn(true);
                 when(documentRepository.existsByTenantIdAndFileHash(eq(tenantId), anyString())).thenReturn(false);
                 when(ingestionService.createDocument(any(), eq(tenantId), anyString())).thenReturn(UUID.randomUUID());
 
@@ -65,18 +78,34 @@ class DocumentControllerTest {
         }
 
         @Test
-        void upload_invalidPdfContent_shouldReturnBadRequest() throws Exception {
+        void upload_invalidPdfContent_shouldReturn429WithErrorMessage() throws Exception {
                 UUID tenantId = UUID.randomUUID();
                 when(sandboxResolver.resolve(any())).thenReturn(tenantId);
-                when(sandboxService.isValid(tenantId)).thenReturn(true);
-                when(rateLimitService.tryConsume(anyString(), eq(RateLimitType.UPLOAD))).thenReturn(true);
 
                 MockMultipartFile file = new MockMultipartFile(
                                 "file", "test.txt", MediaType.TEXT_PLAIN_VALUE, "not a pdf".getBytes());
 
+                // Controller returns 429 with
+                // Map.of("status","ERROR","code",429,"message","Invalid PDF file.")
                 mockMvc.perform(multipart("/api/documents/upload").file(file))
-                                .andExpect(status().isBadRequest())
+                                .andExpect(status().is(429))
                                 .andExpect(content().string(org.hamcrest.Matchers
-                                                .containsString("\"error\":\"Invalid PDF file.\"")));
+                                                .containsString("\"message\":\"Invalid PDF file.\"")));
+        }
+
+        @Test
+        void upload_duplicateDocument_shouldReturn429() throws Exception {
+                UUID tenantId = UUID.randomUUID();
+                when(sandboxResolver.resolve(any())).thenReturn(tenantId);
+                when(documentRepository.existsByTenantIdAndFileHash(eq(tenantId), anyString())).thenReturn(true);
+
+                byte[] pdfHeader = { 0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E }; // %PDF-1.
+                MockMultipartFile file = new MockMultipartFile(
+                                "file", "test.pdf", MediaType.APPLICATION_PDF_VALUE, pdfHeader);
+
+                mockMvc.perform(multipart("/api/documents/upload").file(file))
+                                .andExpect(status().is(429))
+                                .andExpect(content().string(org.hamcrest.Matchers
+                                                .containsString("\"message\":\"This document has already been uploaded.\"")));
         }
 }
