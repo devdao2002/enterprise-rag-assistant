@@ -6,9 +6,8 @@ import com.ducdo.ai_assistant.service.RateLimitType;
 import com.ducdo.ai_assistant.service.SandboxService;
 import com.ducdo.ai_assistant.util.SandboxResolver;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.UUID;
 
@@ -31,25 +30,39 @@ public class AskController {
         this.sandboxResolver = sandboxResolver;
     }
 
-    @GetMapping("/ask")
-    public ResponseEntity<String> ask(@RequestParam String question,
-                      HttpServletRequest request) {
-        UUID tenantId = sandboxResolver.resolve(request);
+    @GetMapping(value = "/ask/stream", produces = "text/event-stream")
+    public SseEmitter ask(@RequestParam String question,
+                          HttpServletRequest request) {
 
-        if (!sandboxService.isValid(tenantId)) {
-            return ResponseEntity.badRequest()
-                    .body("Sandbox expired.");
+        SseEmitter emitter = new SseEmitter(0L);
+
+        try {
+
+            UUID tenantId = sandboxResolver.resolve(request);
+
+            if (!sandboxService.isValid(tenantId)) {
+                emitter.send("Sandbox expired.");
+                emitter.complete();
+                return emitter;
+            }
+
+            String ip = extractClientIp(request);
+
+            if (!rateLimitService.tryConsume(ip, RateLimitType.ASK)) {
+                emitter.send("Too many requests. Please try again later.");
+                emitter.complete();
+                return emitter;
+            }
+
+            return ragService.askStream(question, tenantId);
+
+        } catch (Exception e) {
+            try {
+                emitter.send("Internal error.");
+            } catch (Exception ignored) {}
+            emitter.completeWithError(e);
+            return emitter;
         }
-        String ip = extractClientIp(request);
-
-        if (!rateLimitService.tryConsume(ip, RateLimitType.ASK)) {
-            return ResponseEntity
-                    .status(429)
-                    .body("Too many requests. Please try again later.");
-        }
-
-        String answer = ragService.ask(question, tenantId);
-        return ResponseEntity.ok(answer);
     }
     private String extractClientIp(HttpServletRequest request) {
 

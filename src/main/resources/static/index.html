@@ -319,12 +319,6 @@
 
     async function askQuestion() {
 
-        if (!appState.document.ready) {
-            document.getElementById("answer").innerText =
-                "Please upload a document first.";
-            return;
-        }
-
         const question = document.getElementById("question").value;
         const answerEl = document.getElementById("answer");
 
@@ -332,24 +326,56 @@
             answerEl.innerText = "Please enter a question.";
             return;
         }
-
         answerEl.innerHTML =
             `<span class="text-gray-500">Thinking...</span>`;
 
-        const res = await fetch(
-            `/api/ask?question=${encodeURIComponent(question)}`,
+        const response = await fetch(
+            `/api/ask/stream?question=${encodeURIComponent(question)}`,
             {
-                headers: { "X-Sandbox-Token": appState.sandbox.token }
+                headers: {
+                    "X-Sandbox-Token": appState.sandbox.token
+                }
             }
         );
 
-        if (!res.ok) {
-            answerEl.innerText = "Error processing request.";
-            return;
-        }
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
 
-        answerEl.innerHTML =
-            `<div class="whitespace-pre-wrap">${await res.text()}</div>`;
+        let buffer = "";
+        answerEl.innerHTML="";
+        while (true) {
+
+
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            const lines = buffer.split("\n");
+            buffer = lines.pop();
+
+            for (let line of lines) {
+
+                line = line.trim();
+
+                if (line.startsWith("data:")) {
+
+                    const jsonStr = line.replace("data:", "").trim();
+
+                    if (!jsonStr) continue;
+
+                    const obj = JSON.parse(jsonStr);
+
+                    if (obj.type === "token") {
+                        answerEl.innerText += obj.content;
+                    }
+
+                    if (obj.type === "sources") {
+                        answerEl.innerText += "\n" + obj.content;
+                    }
+                }
+            }
+        }
     }
 
     function formatTime(seconds) {
