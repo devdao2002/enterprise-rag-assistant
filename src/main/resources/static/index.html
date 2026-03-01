@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Enterprise AI Assistant - Demo</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/highlight.js/styles/github.min.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js/lib/common.min.js"></script>
 </head>
 
 <body class="bg-gray-100 min-h-screen">
@@ -371,6 +375,12 @@
 
                         if (obj.type === "sources") {
                             answerEl.innerText += "\n\nSource: " + obj.content;
+                        }
+
+                        if (json.type === "done") {
+                            document.querySelectorAll(answerEl).forEach((block) => {
+                                hljs.highlightElement(block);
+                            });
                         }
                     } catch (e) {
                         console.error("Error parsing chunk", e, chunk);
