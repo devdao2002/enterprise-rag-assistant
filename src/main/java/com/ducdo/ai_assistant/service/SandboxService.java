@@ -61,7 +61,7 @@ public class SandboxService {
     // =============================
 
     @Transactional
-    @Scheduled(fixedRate = 600000) // mỗi 10 phút
+    @Scheduled(fixedRate = 600000) // 10 mins
     public void cleanupExpiredSandboxes() {
 
         List<UUID> expired =

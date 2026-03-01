@@ -1,4 +1,4 @@
-package com.ducdo.ai_assistant.util;
+package com.ducdo.ai_assistant.security.resolver;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;

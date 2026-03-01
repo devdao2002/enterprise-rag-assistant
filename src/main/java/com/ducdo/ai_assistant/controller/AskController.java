@@ -4,7 +4,7 @@ import com.ducdo.ai_assistant.service.RagService;
 import com.ducdo.ai_assistant.service.RateLimitService;
 import com.ducdo.ai_assistant.service.RateLimitType;
 import com.ducdo.ai_assistant.service.SandboxService;
-import com.ducdo.ai_assistant.util.SandboxResolver;
+import com.ducdo.ai_assistant.security.resolver.SandboxResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -46,14 +46,6 @@ public class AskController {
                 return emitter;
             }
 
-            String ip = extractClientIp(request);
-
-            if (!rateLimitService.tryConsume(ip, RateLimitType.ASK)) {
-                emitter.send("Too many requests. Please try again later.");
-                emitter.complete();
-                return emitter;
-            }
-
             return ragService.askStream(question, tenantId);
 
         } catch (Exception e) {
@@ -63,15 +55,5 @@ public class AskController {
             emitter.completeWithError(e);
             return emitter;
         }
-    }
-    private String extractClientIp(HttpServletRequest request) {
-
-        String header = request.getHeader("X-Forwarded-For");
-
-        if (header != null && !header.isEmpty()) {
-            return header.split(",")[0];
-        }
-
-        return request.getRemoteAddr();
     }
 }

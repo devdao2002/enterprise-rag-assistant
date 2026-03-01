@@ -7,9 +7,8 @@ import com.ducdo.ai_assistant.service.RateLimitService;
 import com.ducdo.ai_assistant.service.RateLimitType;
 import com.ducdo.ai_assistant.service.SandboxService;
 import com.ducdo.ai_assistant.util.HashUtils;
-import com.ducdo.ai_assistant.util.SandboxResolver;
+import com.ducdo.ai_assistant.security.resolver.SandboxResolver;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -43,22 +42,6 @@ public class DocumentController {
     public ResponseEntity<Map<String, Object>> upload(@RequestParam("file") MultipartFile file,
                                          HttpServletRequest request) throws Exception {
         UUID tenantId = sandboxResolver.resolve(request);
-
-        if (!sandboxService.isValid(tenantId)) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of(
-                            "error", "Sandbox expired."
-                    ));
-        }
-        String ip = extractClientIp(request);
-
-        if (!rateLimitService.tryConsume(ip, RateLimitType.UPLOAD)) {
-            ResponseEntity.badRequest()
-                    .body(Map.of(
-                            "error", "Upload rate limit exceeded."
-                    ));
-        }
-
         byte[] header = file.getBytes();
 
         if (header.length < 4 ||
@@ -68,9 +51,11 @@ public class DocumentController {
                 header[3] != 'F') {
 
             return ResponseEntity
-                    .badRequest()
+                    .status(429)
                     .body(Map.of(
-                    "error", "Invalid PDF file."
+                            "status", "ERROR",
+                            "code", 429,
+                            "message", "Invalid PDF file."
             ));
         }
 
@@ -80,8 +65,10 @@ public class DocumentController {
 
         if (documentRepository.existsByTenantIdAndFileHash(tenantId, hash)) {
             return ResponseEntity
-                    .badRequest().body(Map.of(
-                            "error","This document has already been uploaded."
+                    .status(429).body(Map.of(
+                            "status", "ERROR",
+                            "code", 429,
+                            "message","This document has already been uploaded."
                     ));
         }
 
@@ -135,16 +122,5 @@ public class DocumentController {
         return ResponseEntity.ok(Map.of(
                 "hasDocument", exists
         ));
-    }
-
-    private String extractClientIp(HttpServletRequest request) {
-
-        String header = request.getHeader("X-Forwarded-For");
-
-        if (header != null && !header.isEmpty()) {
-            return header.split(",")[0];
-        }
-
-        return request.getRemoteAddr();
     }
 }

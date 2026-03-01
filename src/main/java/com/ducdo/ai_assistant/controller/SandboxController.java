@@ -1,7 +1,7 @@
 package com.ducdo.ai_assistant.controller;
 
 import com.ducdo.ai_assistant.service.SandboxService;
-import com.ducdo.ai_assistant.util.SandboxResolver;
+import com.ducdo.ai_assistant.security.resolver.SandboxResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
