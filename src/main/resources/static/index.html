@@ -134,6 +134,9 @@
     <!-- Footer -->
     <footer class="mt-16 border-t pt-6 text-center text-sm text-gray-500">
         © <span id="year"></span> Duc Do
+        <div class="text-xs text-gray-400 mt-2" id="versionInfo">
+            Loading version...
+        </div>
     </footer>
 
 </div>
@@ -272,8 +275,9 @@
         });
 
         if (!res.ok) {
+            const error = await res.json();
             statusEl.innerHTML =
-                `<span class="text-red-600">${await res.text()}</span>`;
+                `<span class="text-red-600">${error.message}</span>`;
             return;
         }
 
@@ -344,14 +348,22 @@
             }
         );
 
+        if (!response.ok) {
+            const error = await response.json();
+            answerEl.innerHTML = "";
+            const span = document.createElement("span");
+            span.className = "text-red-600";
+            span.textContent = error.message.trim();
+            answerEl.appendChild(span);
+            return;
+        }
+
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
 
         let buffer = "";
         answerEl.innerHTML="";
         while (true) {
-
-
             const { done, value } = await reader.read();
             if (done) break;
 
@@ -444,6 +456,29 @@
             .querySelector("button[onclick='askQuestion()']")
             .disabled = true;
     }
+
+    async function loadVersion() {
+
+        try {
+
+            const res = await fetch("/api/version");
+            const data = await res.json();
+
+            document.getElementById("versionInfo").innerHTML = `
+            Version ${data.version} •
+            <a href="${data.commitUrl}"
+               target="_blank"
+               class="underline hover:text-gray-600">
+               ${data.commitShort}
+            </a>
+        `;
+
+        } catch (e) {
+            console.warn("Cannot load version info");
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", loadVersion);
 
     /* ================================
        Boot

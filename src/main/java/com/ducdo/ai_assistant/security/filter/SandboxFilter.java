@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -23,6 +24,9 @@ public class SandboxFilter extends OncePerRequestFilter {
     private final SandboxResolver sandboxResolver;
     private final SandboxService sandboxService;
     private final ErrorResponseWriter errorWriter;
+    private static final List<String> EXCLUDED_PATHS = List.of(
+            "/api/version"
+    );
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -30,6 +34,10 @@ public class SandboxFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String path = request.getRequestURI();
+        if (EXCLUDED_PATHS.stream().anyMatch(path::startsWith)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         if (!path.startsWith("/api")) {
             filterChain.doFilter(request, response);

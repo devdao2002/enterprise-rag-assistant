@@ -36,6 +36,11 @@ spring:
 # Demo configuration
 # ===============================
 app:
+  version: ${APP_VERSION:0.0.1}
+  git:
+    commit: ${APP_GIT_COMMIT:unknown}
+    build:
+      time: ${APP_BUILD_TIME:unknown}
   demo:
     auto-cleanup-enabled: true
     cleanup-interval-hours: 4
