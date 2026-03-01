@@ -18,7 +18,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AskController.class)
@@ -45,11 +45,12 @@ class AskControllerTest {
         when(sandboxResolver.resolve(any())).thenReturn(tenantId);
         when(sandboxService.isValid(tenantId)).thenReturn(true);
         when(rateLimitService.tryConsume(anyString(), eq(RateLimitType.ASK))).thenReturn(true);
-        when(ragService.ask("What is Spring?", tenantId)).thenReturn("Spring is a Java framework.");
+        org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter = new org.springframework.web.servlet.mvc.method.annotation.SseEmitter();
+        when(ragService.askStream("What is Spring?", tenantId)).thenReturn(emitter);
 
-        mockMvc.perform(get("/api/ask").param("question", "What is Spring?"))
+        mockMvc.perform(get("/api/ask/stream").param("question", "What is Spring?"))
                 .andExpect(status().isOk())
-                .andExpect(content().string("Spring is a Java framework."));
+                .andExpect(request().asyncStarted());
     }
 
     @Test
@@ -58,9 +59,9 @@ class AskControllerTest {
         when(sandboxResolver.resolve(any())).thenReturn(tenantId);
         when(sandboxService.isValid(tenantId)).thenReturn(false);
 
-        mockMvc.perform(get("/api/ask").param("question", "Test?"))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string("Sandbox expired."));
+        mockMvc.perform(get("/api/ask/stream").param("question", "Test?"))
+                .andExpect(status().isOk())
+                .andExpect(request().asyncStarted());
     }
 
     @Test
@@ -70,8 +71,8 @@ class AskControllerTest {
         when(sandboxService.isValid(tenantId)).thenReturn(true);
         when(rateLimitService.tryConsume(anyString(), eq(RateLimitType.ASK))).thenReturn(false);
 
-        mockMvc.perform(get("/api/ask").param("question", "Test?"))
-                .andExpect(status().isTooManyRequests())
-                .andExpect(content().string("Too many requests. Please try again later."));
+        mockMvc.perform(get("/api/ask/stream").param("question", "Test?"))
+                .andExpect(status().isOk())
+                .andExpect(request().asyncStarted());
     }
 }

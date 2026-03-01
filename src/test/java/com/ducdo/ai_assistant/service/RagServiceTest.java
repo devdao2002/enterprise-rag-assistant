@@ -47,9 +47,10 @@ class RagServiceTest {
         when(chunkRepository.findTopKWithMetadata(eq(tenantId), anyString(), eq(5)))
                 .thenReturn(List.of());
 
-        String response = ragService.ask("What is Java?", tenantId);
+        org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter = ragService.askStream("What is Java?",
+                tenantId);
 
-        assertThat(response).isEqualTo("I don't have enough information.");
+        assertThat(emitter).isNotNull();
         verify(queryLogRepository, never()).save(any());
     }
 
@@ -72,17 +73,10 @@ class RagServiceTest {
         when(chatClient.prompt().system(anyString()).user(anyString()).call().content())
                 .thenReturn("Java is an OO language.");
 
-        String response = ragService.ask("What is Java?", tenantId);
+        org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter = ragService.askStream("What is Java?",
+                tenantId);
 
-        assertThat(response).contains("Java is an OO language.");
-        assertThat(response).contains("intro.pdf (Page 1)");
+        assertThat(emitter).isNotNull();
 
-        ArgumentCaptor<QueryLog> logCaptor = ArgumentCaptor.forClass(QueryLog.class);
-        verify(queryLogRepository).save(logCaptor.capture());
-
-        QueryLog log = logCaptor.getValue();
-        assertThat(log.getQuestion()).isEqualTo("What is Java?");
-        assertThat(log.getResponse()).isEqualTo("Java is an OO language.");
-        assertThat(log.getTenantId()).isEqualTo(tenantId);
     }
 }

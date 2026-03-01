@@ -351,28 +351,30 @@
 
             buffer += decoder.decode(value, { stream: true });
 
-            const lines = buffer.split("\n");
-            buffer = lines.pop();
+            let newlineIndex;
+            while ((newlineIndex = buffer.indexOf(`\n\n`)) >= 0) {
+                let chunk = buffer.slice(0, newlineIndex).trim();
+                buffer = buffer.slice(newlineIndex + 2);
 
-            for (let line of lines) {
-
-                line = line.trim();
-
-                if (line.startsWith("data:")) {
-
-                    const jsonStr = line.replace("data:", "").trim();
-
+                if (chunk.startsWith("data:")) {
+                    const jsonStr = chunk.replace("data:", "").trim();
                     if (!jsonStr) continue;
 
-                    const obj = JSON.parse(jsonStr);
+                    try {
+                        const obj = JSON.parse(jsonStr);
 
-                    if (obj.type === "token") {
-                        answerEl.innerText += obj.content;
-                    }
+                        if (obj.type === "token") {
+                            answerEl.innerText += obj.content;
+                        }
 
-                    if (obj.type === "sources") {
-                        answerEl.innerText += "\n" + obj.content;
+                        if (obj.type === "sources") {
+                            answerEl.innerText += "\n\nSource: " + obj.content;
+                        }
+                    } catch (e) {
+                        console.error("Error parsing chunk", e, chunk);
                     }
+                    // Auto-scroll inside chat
+                    answerEl.scrollTop = answerEl.scrollHeight;
                 }
             }
         }

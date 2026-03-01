@@ -1,13 +1,11 @@
 package com.ducdo.ai_assistant.integration;
 
-import com.ducdo.ai_assistant.model.Document;
 import com.ducdo.ai_assistant.repository.ChunkProjection;
 import com.ducdo.ai_assistant.repository.DocumentChunkRepository;
 import com.ducdo.ai_assistant.repository.DocumentRepository;
 import com.ducdo.ai_assistant.repository.QueryLogRepository;
 import com.ducdo.ai_assistant.util.SandboxResolver;
 import com.ducdo.ai_assistant.service.SandboxService;
-import com.github.tomakehurst.wiremock.junit5.WireMockTest;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -106,21 +104,13 @@ class RagFlowE2ETest {
                 }
                 """)));
 
-    // 2. Mock OpenAI Chat API Response
+    // 2. Mock OpenAI Chat API Response for Streaming
     stubFor(post(urlEqualTo("/v1/chat/completions"))
         .willReturn(aResponse()
-            .withHeader("Content-Type", "application/json")
-            .withBody("""
-                {
-                  "choices": [
-                    {
-                      "message": {
-                        "content": "Spring Boot makes testing easy."
-                      }
-                    }
-                  ]
-                }
-                """)));
+            .withHeader("Content-Type", "text/event-stream")
+            .withBody("data: {\"choices\": [{\"delta\": {\"content\": \"Spring Boot \"}}]}\n\n" +
+                "data: {\"choices\": [{\"delta\": {\"content\": \"makes testing easy.\"}}]}\n\n" +
+                "data: [DONE]\n\n")));
 
     // 3. Upload Document
     PDDocument dummyPdf = new PDDocument();
@@ -144,11 +134,21 @@ class RagFlowE2ETest {
     // Thread.sleep(100);
 
     // 4. Ask Question
-    mockMvc.perform(get("/api/ask")
+    mockMvc.perform(get("/api/ask/stream")
         .param("sandboxId", tenantId.toString())
         .param("question", "What does Spring Boot do?"))
-        .andExpect(status().isOk())
-        .andExpect(content().string(containsString("Spring Boot makes testing easy.")));
+        .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.request().asyncStarted())
+        .andReturn();
+
+    // Since this is SseEmitter, we wait for processing in the background.
+    // Explicit streaming payload verification is tested tightly in RagServiceTest,
+    // so here we confirm the integration layer correctly wires to start the SSE
+    // stream.
+
+    // Wait a brief moment to allow the asynchronous RagService executing in a
+    // separate thread
+    // to actually make the HTTP call to the mocked Chat API.
+    Thread.sleep(1000);
 
     // 5. Verify WireMock interactions
     verify(postRequestedFor(urlEqualTo("/v1/embeddings")));

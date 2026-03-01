@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
-import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,7 +38,7 @@ public class IngestionService {
     /**
      * Create document record and return immediately
      */
-    public UUID createDocument(MultipartFile file, UUID tenantId,String hash) {
+    public UUID createDocument(MultipartFile file, UUID tenantId, String hash) {
 
         Document document = Document.builder()
                 .id(UUID.randomUUID())
@@ -63,17 +62,17 @@ public class IngestionService {
     @Async("ingestionExecutor")
     @Transactional
     public void ingestPdfAsync(byte[] fileBytes,
-                               UUID tenantId,
-                               UUID documentId) {
+            UUID tenantId,
+            UUID documentId) {
 
         long start = System.currentTimeMillis();
 
-        try (PDDocument pdf =
-                     PDDocument.load(new ByteArrayInputStream(fileBytes))) {
+        try (PDDocument pdf = PDDocument.load(new ByteArrayInputStream(fileBytes))) {
 
             PDFTextStripper stripper = new PDFTextStripper();
 
-            record ChunkData(String content, int pageNumber) {}
+            record ChunkData(String content, int pageNumber) {
+            }
 
             int totalPages = pdf.getNumberOfPages();
 
@@ -86,10 +85,9 @@ public class IngestionService {
 
                 String pageText = stripper.getText(pdf);
 
-                List<String> chunks =
-                        TextChunker.chunkText(pageText,
-                                CHUNK_SIZE,
-                                CHUNK_OVERLAP);
+                List<String> chunks = TextChunker.chunkText(pageText,
+                        CHUNK_SIZE,
+                        CHUNK_OVERLAP);
 
                 for (String chunk : chunks) {
                     allChunks.add(new ChunkData(chunk, page));
@@ -126,12 +124,11 @@ public class IngestionService {
                                     .tenantId(tenantId)
                                     .content(chunkData.content())
                                     .chunkIndex(i + j)
-                                    .pageNumber(chunkData.pageNumber())   // 🔥 FIX
+                                    .pageNumber(chunkData.pageNumber())
                                     .tokenCount(chunkData.content().length())
                                     .embedding(embeddings.get(j))
                                     .createdAt(LocalDateTime.now())
-                                    .build()
-                    );
+                                    .build());
                 }
 
                 chunkRepository.saveAll(entities);
@@ -147,7 +144,7 @@ public class IngestionService {
 
         } catch (Exception e) {
 
-            log.error("Ingestion failed", e);
+            log.error("Ingestion failed for document {}: {}", documentId, e.getMessage());
             documentRepository.updateStatus(documentId, "FAILED");
         }
     }
