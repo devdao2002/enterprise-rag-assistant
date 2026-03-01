@@ -1,6 +1,6 @@
 spring:
   application:
-    name: Lynor AI
+    name: LynorAI
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
@@ -23,10 +23,10 @@ spring:
       api-key: ${OPENAI_API_KEY}
       chat:
         options:
-          model: gpt-5-nano
+          model: ${OPENAI_CHAT_MODEL:gpt-5-nano}
       embedding:
         options:
-          model: text-embedding-3-small
+          model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
   servlet:
     multipart:
       max-file-size: 5MB
