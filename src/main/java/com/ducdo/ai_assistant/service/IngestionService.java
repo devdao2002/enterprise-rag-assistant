@@ -39,7 +39,7 @@ public class IngestionService {
     /**
      * Create document record and return immediately
      */
-    public UUID createDocument(MultipartFile file, UUID tenantId) {
+    public UUID createDocument(MultipartFile file, UUID tenantId,String hash) {
 
         Document document = Document.builder()
                 .id(UUID.randomUUID())
@@ -50,6 +50,7 @@ public class IngestionService {
                 .status("PROCESSING")
                 .createdAt(LocalDateTime.now())
                 .build();
+        document.setFileHash(hash);
 
         documentRepository.save(document);
 

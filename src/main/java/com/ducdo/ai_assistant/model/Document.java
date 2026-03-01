@@ -36,6 +36,9 @@ public class Document {
 
     private String status;
 
+    @Column(name = "file_hash", length = 64)
+    private String fileHash;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

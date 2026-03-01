@@ -35,4 +35,6 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     );
 
     boolean existsByTenantIdAndStatus(UUID tenantId, String status);
+
+    boolean existsByTenantIdAndFileHash(UUID tenantId, String fileHash);
 }

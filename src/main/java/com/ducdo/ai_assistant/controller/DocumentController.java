@@ -6,6 +6,7 @@ import com.ducdo.ai_assistant.service.IngestionService;
 import com.ducdo.ai_assistant.service.RateLimitService;
 import com.ducdo.ai_assistant.service.RateLimitType;
 import com.ducdo.ai_assistant.service.SandboxService;
+import com.ducdo.ai_assistant.util.HashUtils;
 import com.ducdo.ai_assistant.util.SandboxResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -42,8 +43,6 @@ public class DocumentController {
     public ResponseEntity<Map<String, Object>> upload(@RequestParam("file") MultipartFile file,
                                          HttpServletRequest request) throws Exception {
         UUID tenantId = sandboxResolver.resolve(request);
-        UUID documentId =
-                ingestionService.createDocument(file, tenantId);
 
         if (!sandboxService.isValid(tenantId)) {
             return ResponseEntity.badRequest()
@@ -71,9 +70,23 @@ public class DocumentController {
             return ResponseEntity
                     .badRequest()
                     .body(Map.of(
-                    "error", "Invalid PDF file.."
+                    "error", "Invalid PDF file."
             ));
         }
+
+
+        byte[] fileBytes = file.getBytes();
+        String hash = HashUtils.sha256(fileBytes);
+
+        if (documentRepository.existsByTenantIdAndFileHash(tenantId, hash)) {
+            return ResponseEntity
+                    .badRequest().body(Map.of(
+                            "error","This document has already been uploaded."
+                    ));
+        }
+
+        UUID documentId =
+                ingestionService.createDocument(file, tenantId,hash);
 
         ingestionService.ingestPdfAsync(
                 header, //filebytes
