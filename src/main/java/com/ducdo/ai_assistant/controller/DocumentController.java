@@ -3,9 +3,6 @@ package com.ducdo.ai_assistant.controller;
 import com.ducdo.ai_assistant.model.Document;
 import com.ducdo.ai_assistant.repository.DocumentRepository;
 import com.ducdo.ai_assistant.service.IngestionService;
-import com.ducdo.ai_assistant.service.RateLimitService;
-import com.ducdo.ai_assistant.service.RateLimitType;
-import com.ducdo.ai_assistant.service.SandboxService;
 import com.ducdo.ai_assistant.util.HashUtils;
 import com.ducdo.ai_assistant.security.resolver.SandboxResolver;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,19 +18,13 @@ import java.util.UUID;
 public class DocumentController {
 
     private final IngestionService ingestionService;
-    private final RateLimitService rateLimitService;
-    private final SandboxService sandboxService;
     private final SandboxResolver sandboxResolver;
     private final DocumentRepository documentRepository;
 
     public DocumentController(IngestionService ingestionService,
-                              RateLimitService rateLimitService,
-                              SandboxService sandboxService ,
                               SandboxResolver sandboxResolver,
                               DocumentRepository documentRepository) {
-        this.rateLimitService = rateLimitService;
         this.ingestionService = ingestionService;
-        this.sandboxService = sandboxService;
         this.sandboxResolver = sandboxResolver;
         this.documentRepository = documentRepository;
     }
@@ -42,13 +33,13 @@ public class DocumentController {
     public ResponseEntity<Map<String, Object>> upload(@RequestParam("file") MultipartFile file,
                                          HttpServletRequest request) throws Exception {
         UUID tenantId = sandboxResolver.resolve(request);
-        byte[] header = file.getBytes();
+        byte[] fileBytes = file.getBytes();
 
-        if (header.length < 4 ||
-                header[0] != '%' ||
-                header[1] != 'P' ||
-                header[2] != 'D' ||
-                header[3] != 'F') {
+        if (fileBytes.length < 4 ||
+                fileBytes[0] != '%' ||
+                fileBytes[1] != 'P' ||
+                fileBytes[2] != 'D' ||
+                fileBytes[3] != 'F') {
 
             return ResponseEntity
                     .status(429)
@@ -60,7 +51,7 @@ public class DocumentController {
         }
 
 
-        byte[] fileBytes = file.getBytes();
+
         String hash = HashUtils.sha256(fileBytes);
 
         if (documentRepository.existsByTenantIdAndFileHash(tenantId, hash)) {
@@ -76,7 +67,7 @@ public class DocumentController {
                 ingestionService.createDocument(file, tenantId,hash);
 
         ingestionService.ingestPdfAsync(
-                header, //filebytes
+                fileBytes,
                 tenantId,
                 documentId
         );

@@ -1,8 +1,6 @@
 package com.ducdo.ai_assistant.controller;
 
 import com.ducdo.ai_assistant.service.RagService;
-import com.ducdo.ai_assistant.service.RateLimitService;
-import com.ducdo.ai_assistant.service.RateLimitType;
 import com.ducdo.ai_assistant.service.SandboxService;
 import com.ducdo.ai_assistant.security.resolver.SandboxResolver;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,16 +14,13 @@ import java.util.UUID;
 public class AskController {
 
     private final RagService ragService;
-    private final RateLimitService rateLimitService;
     private final SandboxService sandboxService;
     private final SandboxResolver sandboxResolver;
 
     public AskController(RagService ragService,
-                         RateLimitService rateLimitService,
                          SandboxService sandboxService ,
                          SandboxResolver sandboxResolver) {
         this.ragService = ragService;
-        this.rateLimitService=rateLimitService;
         this.sandboxService = sandboxService;
         this.sandboxResolver = sandboxResolver;
     }

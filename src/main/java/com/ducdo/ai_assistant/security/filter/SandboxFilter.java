@@ -4,7 +4,6 @@ import com.ducdo.ai_assistant.security.context.TenantContext;
 import com.ducdo.ai_assistant.security.exception.ErrorResponseWriter;
 import com.ducdo.ai_assistant.security.resolver.SandboxResolver;
 import com.ducdo.ai_assistant.service.SandboxService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
