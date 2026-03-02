@@ -4,8 +4,6 @@ import com.ducdo.ai_assistant.security.exception.ErrorResponseWriter;
 import com.ducdo.ai_assistant.security.filter.RateLimitFilter;
 import com.ducdo.ai_assistant.security.filter.SandboxFilter;
 import com.ducdo.ai_assistant.service.IngestionService;
-import com.ducdo.ai_assistant.service.RateLimitService;
-import com.ducdo.ai_assistant.service.SandboxService;
 import com.ducdo.ai_assistant.security.resolver.SandboxResolver;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,12 +38,6 @@ class DocumentControllerTest {
         private com.ducdo.ai_assistant.repository.DocumentRepository documentRepository;
 
         @MockitoBean
-        private RateLimitService rateLimitService;
-
-        @MockitoBean
-        private SandboxService sandboxService;
-
-        @MockitoBean
         private SandboxResolver sandboxResolver;
 
         // Required for filter bean dependency resolution even with addFilters=false
@@ -62,7 +54,6 @@ class DocumentControllerTest {
         void upload_validPdf_shouldReturnOk() throws Exception {
                 UUID tenantId = UUID.randomUUID();
                 when(sandboxResolver.resolve(any())).thenReturn(tenantId);
-                when(sandboxService.isValid(tenantId)).thenReturn(true);
                 when(documentRepository.existsByTenantIdAndFileHash(eq(tenantId), anyString())).thenReturn(false);
                 when(ingestionService.createDocument(any(), eq(tenantId), anyString())).thenReturn(UUID.randomUUID());
 
@@ -85,8 +76,6 @@ class DocumentControllerTest {
                 MockMultipartFile file = new MockMultipartFile(
                                 "file", "test.txt", MediaType.TEXT_PLAIN_VALUE, "not a pdf".getBytes());
 
-                // Controller returns 429 with
-                // Map.of("status","ERROR","code",429,"message","Invalid PDF file.")
                 mockMvc.perform(multipart("/api/documents/upload").file(file))
                                 .andExpect(status().is(429))
                                 .andExpect(content().string(org.hamcrest.Matchers

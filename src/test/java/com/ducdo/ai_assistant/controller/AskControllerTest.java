@@ -4,7 +4,6 @@ import com.ducdo.ai_assistant.security.exception.ErrorResponseWriter;
 import com.ducdo.ai_assistant.security.filter.RateLimitFilter;
 import com.ducdo.ai_assistant.security.filter.SandboxFilter;
 import com.ducdo.ai_assistant.service.RagService;
-import com.ducdo.ai_assistant.service.RateLimitService;
 import com.ducdo.ai_assistant.service.SandboxService;
 import com.ducdo.ai_assistant.security.resolver.SandboxResolver;
 import org.junit.jupiter.api.Test;
@@ -32,9 +31,6 @@ class AskControllerTest {
 
     @MockitoBean
     private RagService ragService;
-
-    @MockitoBean
-    private RateLimitService rateLimitService;
 
     @MockitoBean
     private SandboxService sandboxService;

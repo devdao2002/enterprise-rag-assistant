@@ -11,7 +11,6 @@ import com.ducdo.ai_assistant.service.SandboxService;
 import com.ducdo.ai_assistant.service.VersionService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
@@ -33,10 +32,13 @@ public class BootstrapController {
         UUID tenantId = resolveOrCreateSandbox(request);
         var sandbox = sandboxService.getSandbox(tenantId);
         long remainingSeconds =
-                Duration.between(
+                Math.max(
+                        0,
+                        Duration.between(
                         LocalDateTime.now(),
                         sandbox.getExpiresAt()
-                ).getSeconds();
+                ).getSeconds()
+                );
 
         boolean hasDocument =
                 ingestionService.hasReadyDocument(tenantId);
