@@ -1,5 +1,6 @@
-# Enterprise Internal AI Document Q&A (RAG)
-An enterprise-grade internal AI assistant built with Spring Boot, PostgreSQL + pgvector, and OpenAI, implementing Retrieval-Augmented Generation (RAG) with citation support.
+# LynorAI - Enterprise RAG Assistant
+
+Spring Boot RAG application for PDF Q&A with sandbox isolation, vector search (pgvector), and OpenAI models.
 
 ````
 ██╗      ██╗   ██╗███╗   ██╗ ██████╗ ██████╗  █████╗ ██╗
@@ -13,385 +14,180 @@ An enterprise-grade internal AI assistant built with Spring Boot, PostgreSQL + p
 ![Demo Status](https://img.shields.io/badge/Demo-Live-green)
 
 > You can try the live demo version **(v0.0.1)** here: **https://lynorai.space/index.html**
+## Current Status
 
-**Features**
-- Upload PDF documents
+Implemented and aligned in code:
+- Unified bootstrap API: one call to initialize app state
+- Sandbox lifecycle with remaining time in seconds
+- Document readiness recovery after refresh (`documentReady`)
+- Streaming answer endpoint (SSE)
+- PDF upload + async ingestion + dedup by file hash
+- Rate limiting for upload/ask
+- Flyway migrations for schema evolution
+- Test suite updated to run in Docker-restricted environments by default
 
-- Smart chunking with overlap
+## Core Flow
 
-- OpenAI embeddings (text-embedding-3-small)
+1. Frontend calls `GET /api/bootstrap` (with optional `X-Sandbox-Token`)
+2. Backend resolves/creates sandbox and returns:
+   - app version/build metadata
+   - sandbox token + active flag + remaining seconds
+   - `documentReady`
+3. Frontend stores `sandbox.token` in localStorage
+4. Upload endpoint ingests PDF and builds embeddings/chunks
+5. Ask endpoint streams answer tokens via SSE, grounded by retrieved chunks
 
-- Semantic similarity search via pgvector
+## API Overview
 
-- Guarded LLM response (no hallucination outside context)
+### `GET /api/bootstrap`
+Single initialization endpoint used by frontend.
 
-- Citation with document + page reference
+Response shape:
+```json
+{
+  "version": {
+    "version": "0.0.1",
+    "commitFull": "abcdef123456...",
+    "commitShort": "abcdef1",
+    "commitUrl": "https://github.com/devdao2002/enterprise-rag-assistant/commit/abcdef123456...",
+    "buildTime": "2026-03-02T00:00:00Z"
+  },
+  "sandbox": {
+    "token": "uuid",
+    "active": true,
+    "remainingSeconds": 14399
+  },
+  "documentReady": false
+}
+```
 
-- Multi-tenant architecture
+### `POST /api/documents/upload`
+Headers:
+- `X-Sandbox-Token: <uuid>`
 
-- Query logging & latency tracking
+Body:
+- multipart `file` (PDF)
 
-- Flyway database migration
+### `GET /api/documents/status/{documentId}`
+Headers:
+- `X-Sandbox-Token: <uuid>`
 
-**Architecture**
+### `GET /api/ask/stream?question=...`
+Headers:
+- `X-Sandbox-Token: <uuid>`
 
-````
-                               ┌──────────────────────────┐
-                               │        END USER          │
-                               │  (Browser / Public Demo) │
-                               └──────────────┬───────────┘
-                                              │
-                                              ▼
-                               ┌──────────────────────────┐
-                               │      Frontend (HTML)     │
-                               │  - Upload PDF            │
-                               │  - Ask Question          │
-                               │  - Sandbox Token (LS)    │
-                               └──────────────┬───────────┘
-                                              │
-                                X-Sandbox-Token Header
-                                              │
-                                              ▼
-                         ┌────────────────────────────────────┐
-                         │        Spring Boot API             │
-                         │  RAG Orchestration Layer           │
-                         │                                    │
-                         │  - AskController                   │
-                         │  - DocumentController              │
-                         │  - SandboxController               │
-                         │  - RateLimitService (Bucket4j)     │
-                         │  - SandboxService (4h lifecycle)   │
-                         └──────────────┬─────────────────────┘
-                                        │
-                    ┌───────────────────┼──────────────────────┐
-                    ▼                   ▼                      ▼
-         ┌────────────────┐   ┌──────────────────┐   ┌────────────────┐
-         │ OpenAI         │   │ PostgreSQL       │   │ Flyway         │
-         │ Embedding API  │   │ + pgvector       │   │ Migration      │
-         └────────────────┘   └──────────────────┘   └────────────────┘
-                    │                   │
-                    ▼                   ▼
-        ┌────────────────────┐   ┌─────────────────────────────┐
-        │ Text Chunking      │   │ document_chunks (vector)    │
-        │ (Overlap Strategy) │   │ sandbox_sessions            │
-        └────────────────────┘   │ documents                   │
-                                 │ query_logs                  │
-                                 └─────────────────────────────┘
-                                        │
-                                        ▼
-                          ┌──────────────────────────────┐
-                          │ Semantic Search (Top-K)      │
-                          │ embedding <-> vector cosine  │
-                          └──────────────┬───────────────┘
-                                         │
-                                         ▼
-                          ┌──────────────────────────────┐
-                          │ OpenAI Chat Model            │
-                          │ Guarded Prompt + Context     │
-                          └──────────────┬───────────────┘
-                                         │
-                                         ▼
-                         ┌──────────────────────────────────┐
-                         │ Answer + Citation + Logging      │
-                         │ (QueryLog persisted)             │
-                         └──────────────────────────────────┘
-````
+Produces:
+- `text/event-stream`
 
-**Project Structure**
+## Tech Stack
 
-````
-ai-assistant/
-├── controller/
+- Java 17
+- Spring Boot 4.0.3
+- Spring AI (OpenAI)
+- PostgreSQL + pgvector
+- Flyway
+- Apache PDFBox
+- Bucket4j
+- JUnit 5 + Mockito + Testcontainers + WireMock
+
+## Project Structure
+
+```text
+src/main/java/com/ducdo/ai_assistant
+├── controller
 │   ├── AskController.java
-│   ├── DocumentController.java
-│   ├── SandboxController.java
-│
-├── service/
-│   ├── RagService.java
-│   ├── IngestionService.java
-│   ├── SandboxService.java
-│   ├── RateLimitService.java
-│   └── RateLimitType.java
-│
-├── repository/
-│   ├── DocumentRepository.java
-│   ├── DocumentChunkRepository.java
-│   ├── QueryLogRepository.java
-│   └── SandboxRepository.java
-│
-├── model/
-│   ├── Document.java
-│   ├── DocumentChunk.java
-│   ├── QueryLog.java
-│   └── SandboxSession.java
-│
-├── util/
-│   ├── TextChunker.java
-│   ├── VectorUtils.java
-│   └── SandboxResolver.java
-│
-├── config/
-│   ├── OpenAiConfig.java
-│   └── SchedulerConfig.java   (if scheduling enabled)
-│
-├── db/
-│   └── migration/
-│       ├── V1__init_schema.sql
-│       ├── V2__sandbox_sessions.sql
-│       └── V3__remove_legacy_tenant.sql
-│
-├── resources/
-│   ├── application.yml
-│   └── static/
-│       └── index.html
-│
-└── pom.xml
-````
+│   ├── BootstrapController.java
+│   └── DocumentController.java
+├── dto/bootstrap
+│   ├── BootstrapResponse.java
+│   ├── SandboxDto.java
+│   └── VersionDto.java
+├── model
+├── repository
+├── security
+│   ├── filter
+│   └── resolver
+├── service
+└── util
 
-**Tech Stack** :
-Java 17 |
-Spring Boot |
-Spring AI |
-PostgreSQL |
-pgvector |
-Flyway |
-Apache PDFBox |
-OpenAI API
+src/main/resources
+├── application.yaml
+├── db/migration
+└── static/index.html
+```
 
-**Setup**
+## Configuration
 
-1/ Start PostgreSQL + pgvector (Docker) 
-````
-docker run -d \
-  --name pgvector \
-  -e POSTGRES_PASSWORD=password \
-  -p 5432:5432 \
-  ankane/pgvector
-````
-2/ Create database
-````
-bash
-docker exec -it pgvector psql -U postgres
+`src/main/resources/application.yaml` expects environment variables:
 
-sql
-CREATE DATABASE ai;
-````
+- `SPRING_DATASOURCE_URL`
+- `SPRING_DATASOURCE_USERNAME`
+- `SPRING_DATASOURCE_PASSWORD`
+- `OPENAI_API_KEY`
+- `OPENAI_CHAT_MODEL` (optional, default `gpt-5-nano`)
+- `OPENAI_EMBEDDING_MODEL` (optional, default `text-embedding-3-small`)
+- `APP_VERSION` (optional)
+- `APP_GIT_COMMIT` (optional)
+- `APP_BUILD_TIME` (optional)
 
-3/ Configure application.yml
+## Run Locally (Docker Compose)
 
-````
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/ai
-    username: postgres
-    password: password
+1. Set API key:
+```bash
+export OPENAI_API_KEY=your_key_here
+```
 
-  flyway:
-    enabled: true
-    baseline-on-migrate: true
-
-  jpa:
-    hibernate:
-      ddl-auto: none
-
-  ai:
-    openai:
-      api-key: ${OPENAI_API_KEY}
-      chat:
-        options:
-          model: gpt-5-nano
-      embedding:
-        options:
-          model: text-embedding-3-small
-````
-
-4/ Set OpenAI API key
-````
-export OPENAI_API_KEY=your_api_key_here
-````
-
-5/ Run application
-````
-bash
-./mvnw spring-boot:run
-````
-Flyway will automatically create schema.
-
-**Create Tenant (Required Before Upload)**
-````
-INSERT INTO tenants (id, name)
-VALUES ('11111111-1111-1111-1111-111111111111', 'CompanyA');
-````
-
-**Upload PDF**
-
-````
-curl -X POST http://localhost:8080/api/documents/upload \
-  -F "file=@./sample.pdf" \
-  -F "tenantId=11111111-1111-1111-1111-111111111111"
-````
-
-**Ask Question**
-````
-curl -G http://localhost:8080/api/ask \
-  --data-urlencode "question=How many leave days do employees have?" \
-  --data-urlencode "tenantId=11111111-1111-1111-1111-111111111111"
-````
-
-**RAG Flow**
-1.	Extract text from PDF
-2.	Chunk with overlap (1000 chars / 200 overlap)
-3.	Generate embedding
-4.	Store in pgvector
-5.	Embed user question
-6.	Retrieve top-K similar chunks
-7.	Inject context into LLM
-8.	Return answer + citation
-
-**Database Schema**
-- tenants
-
-- documents
-
-- document_chunks (vector indexed)
-
-- query_logs
-
-**Guardrail Prompt**
-
-The system strictly answers only using retrieved context:
-
->“Only answer using the provided context. If not found, say you don’t know.”
-
-Prevents hallucination.
-
-**Example Response**
-````
-Employees have 15 days annual leave.
-
-Source: DocumentId=480b78ec..., Page=3
-````
-
-## Run with Docker (Recommended)
-This project is fully containerized using Docker + Docker Compose.
-
-It will start:
-- Spring Boot RAG Application
-- PostgreSQL with pgvector
-- Automatic Flyway migration
-- Persistent database volume
-
-**Prerequisites**
-- Docker installed
-- Docker Compose installed 
-- OpenAI API Key
-
-Check Docker:
-
-````
-docker --version
-docker compose version
-````
-
-**Set OpenAI API Key**
-
-Export your API key:
-````
-export OPENAI_API_KEY=your_api_key_here
-````
-Or create a .env file:
-````
-OPENAI_API_KEY=your_api_key_here
-````
-Docker Compose will automatically load it.
-
-**Start Full Stack**
-````
+2. Start stack:
+```bash
 docker compose up --build
-````
-**Access Application**
-````
-http://localhost:8080
-````
-**Create Tenant (One-time setup)**
+```
 
-Connect to Postgres:
-````
-docker exec -it rag_postgres psql -U postgres -d ai
-````
+3. Open:
+- `http://localhost:8080`
 
-Create tenant:
-````
-INSERT INTO tenants (id, name)
-VALUES ('11111111-1111-1111-1111-111111111111', 'CompanyA');
-````
-
-**Upload PDF**
-
-````
-curl -X POST http://localhost:8080/api/documents/upload \
-  -F "file=@./sample.pdf" \
-  -F "tenantId=11111111-1111-1111-1111-111111111111"
-````
-
-**Ask Question**
-
-````
-curl -G http://localhost:8080/api/ask \
-  --data-urlencode "question=How many leave days do employees have?" \
-  --data-urlencode "tenantId=11111111-1111-1111-1111-111111111111"
-````
-
-Expected response:
-
-````
-Employees have 15 days annual leave.
-
-Source: DocumentId=xxxx-xxxx, Page=3
-````
-
-**Stop Containers**
-````
+Stop:
+```bash
 docker compose down
-````
+```
 
-**Stop and Remove Database Volume**
+## Run Locally (without Docker Compose)
 
-*This deletes all stored documents and embeddings.*
+Requirements:
+- PostgreSQL with pgvector enabled
+- Database/schema accessible by app credentials
 
-````
-docker compose down -v
-````
+Run app:
+```bash
+./mvnw spring-boot:run
+```
 
-**Inspect Database**
+## Testing
 
-````
-docker exec -it rag_postgres psql -U postgres -d ai
-````
+Default (CI-like local run, no Docker dependency required for pass):
+```bash
+./mvnw test
+```
 
+Notes:
+- `DocumentChunkRepositoryTest` uses Testcontainers and is auto-skipped when Docker is unavailable.
+- `RagFlowE2ETest` is opt-in and disabled by default.
 
+Run integration E2E explicitly:
+```bash
+./mvnw -DrunIntegrationTests=true test
+```
 
+## Security / Guardrails
 
+- Sandbox token required for protected API routes via `X-Sandbox-Token`
+- Sandbox expiry enforced in filter/service
+- Upload and ask rate limits enforced by IP
+- LLM responses are grounded through retrieved context pipeline
 
+## Progress Next
 
-**Production Enhancements (Future)**
-- WT authentication
-- Role-based document access
-- Async ingestion
-- Streaming responses
-- Hybrid search (BM25 + vector)
-- Redis caching
-- HNSW vector index
-- Admin dashboard
-- SaaS multi-organization support
-
-**Why This Matters**
-
-This project demonstrates:
-
-- Enterprise-ready RAG architecture
-- Multi-tenant AI backend
-- Vector search engineering
-- LLM guardrail implementation
-- Clean layered Spring architecture
-
+Planned improvements:
+- tighter e2e assertions for SSE payload content
+- optional hybrid retrieval (keyword + vector)
+- stronger operational metrics/observability
+- auth/role model for production multi-organization use
