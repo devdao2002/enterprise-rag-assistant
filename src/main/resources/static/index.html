@@ -173,6 +173,7 @@
 
             if (data.sandbox.token) {
                 localStorage.setItem("sandboxToken", data.sandbox.token);
+                AppState.document.ready= JSON.parse(data.documentReady);
             }
 
             renderAll();
@@ -436,54 +437,40 @@
         answerEl.innerHTML = "";
 
         while (true) {
-
             const { done, value } =
                 await reader.read();
-
             if (done) break;
 
             buffer += decoder.decode(value, { stream: true });
 
-            let boundary;
-            while ((boundary = buffer.indexOf("\n\n")) >= 0) {
+            let newlineIndex;
+            while ((newlineIndex = buffer.indexOf(`\n\n`)) >= 0) {
+                let chunk = buffer.slice(0, newlineIndex).trim();
+                buffer = buffer.slice(newlineIndex + 2);
 
-                let chunk =
-                    buffer.slice(0, boundary).trim();
+                if (chunk.startsWith("data:")) {
+                    const jsonStr = chunk.replace("data:", "").trim();
+                    if (!jsonStr) continue;
+                    try {
+                        const obj = JSON.parse(jsonStr);
 
-                buffer =
-                    buffer.slice(boundary + 2);
-
-                if (!chunk.startsWith("data:")) continue;
-
-                const jsonStr =
-                    chunk.replace("data:", "").trim();
-
-                if (!jsonStr) continue;
-
-                const obj = JSON.parse(jsonStr);
-
-                if (obj.type === "token") {
-                    fullText += obj.content;
-                    answerEl.innerHTML =
-                        marked.parse(fullText);
+                        if (obj.type === "token") {
+                            answerEl.innerText += obj.content;
+                        }
+                        if (obj.type === "sources") {
+                            answerEl.innerText += "\nSource: " + obj.content;
+                        }
+                        if (json.type === "done") {
+                            document.querySelectorAll(answerEl).forEach((block) => {
+                                hljs.highlightElement(block);
+                            });
+                        }
+                    } catch (e) {
+                        console.error("Error parsing chunk", e, chunk);
+                    }
+                    // Auto-scroll inside chat
+                    answerEl.scrollTop = answerEl.scrollHeight;
                 }
-
-                if (obj.type === "sources") {
-                    fullText += "\n\nSources:\n" + obj.content;
-                    answerEl.innerHTML =
-                        marked.parse(fullText);
-                }
-
-                if (obj.type === "done") {
-                    document
-                        .querySelectorAll("pre code")
-                        .forEach(block =>
-                            hljs.highlightElement(block)
-                        );
-                }
-
-                answerEl.scrollTop =
-                    answerEl.scrollHeight;
             }
         }
 
