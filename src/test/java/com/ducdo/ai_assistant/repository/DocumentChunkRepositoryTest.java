@@ -4,8 +4,6 @@ import com.ducdo.ai_assistant.model.Document;
 import com.ducdo.ai_assistant.model.SandboxSession;
 import java.time.LocalDateTime;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +21,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class DocumentChunkRepositoryTest {
@@ -56,16 +54,6 @@ class DocumentChunkRepositoryTest {
 
     private UUID tenantId;
     private Document document;
-
-    @BeforeAll
-    static void beforeAll() {
-        postgres.start();
-    }
-
-    @AfterAll
-    static void afterAll() {
-        postgres.stop();
-    }
 
     @BeforeEach
     void setUp() {

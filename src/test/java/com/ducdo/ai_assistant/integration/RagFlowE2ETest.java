@@ -6,11 +6,13 @@ import com.ducdo.ai_assistant.repository.DocumentRepository;
 import com.ducdo.ai_assistant.repository.QueryLogRepository;
 import com.ducdo.ai_assistant.security.resolver.SandboxResolver;
 import com.ducdo.ai_assistant.service.SandboxService;
-import com.github.tomakehurst.wiremock.junit5.WireMockTest;
+import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -26,6 +28,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -44,8 +47,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "spring.datasource.password="
 })
 @AutoConfigureMockMvc
-@WireMockTest(httpPort = 8089)
+@EnabledIfSystemProperty(named = "runIntegrationTests", matches = "true")
 class RagFlowE2ETest {
+
+  @RegisterExtension
+  static WireMockExtension wireMock = WireMockExtension.newInstance()
+      .options(wireMockConfig().dynamicPort())
+      .build();
 
   @Autowired
   private MockMvc mockMvc;
@@ -69,7 +77,7 @@ class RagFlowE2ETest {
 
   @DynamicPropertySource
   static void configureProperties(DynamicPropertyRegistry registry) {
-    registry.add("spring.ai.openai.base-url", () -> "http://localhost:8089");
+    registry.add("spring.ai.openai.base-url", wireMock::baseUrl);
     registry.add("spring.ai.openai.api-key", () -> "test-key");
   }
 
@@ -92,7 +100,7 @@ class RagFlowE2ETest {
   @Test
   void completeRagFlow_uploadThenAsk() throws Exception {
     // 1. Mock OpenAI Embedding API Response
-    stubFor(post(urlEqualTo("/v1/embeddings"))
+    wireMock.stubFor(post(urlEqualTo("/v1/embeddings"))
         .willReturn(aResponse()
             .withHeader("Content-Type", "application/json")
             .withBody("""
@@ -106,7 +114,7 @@ class RagFlowE2ETest {
                 """)));
 
     // 2. Mock OpenAI Chat API Response for Streaming
-    stubFor(post(urlEqualTo("/v1/chat/completions"))
+    wireMock.stubFor(post(urlEqualTo("/v1/chat/completions"))
         .willReturn(aResponse()
             .withHeader("Content-Type", "text/event-stream")
             .withBody("data: {\"choices\": [{\"delta\": {\"content\": \"Spring Boot \"}}]}\n\n" +
@@ -152,9 +160,9 @@ class RagFlowE2ETest {
     Thread.sleep(1000);
 
     // 5. Verify WireMock interactions
-    verify(postRequestedFor(urlEqualTo("/v1/embeddings")));
+    wireMock.verify(postRequestedFor(urlEqualTo("/v1/embeddings")));
     // Since the prompt uses retrieved documents, and we just ingested one, a chat
     // completion should trigger
-    verify(postRequestedFor(urlEqualTo("/v1/chat/completions")));
+    wireMock.verify(postRequestedFor(urlEqualTo("/v1/chat/completions")));
   }
 }
