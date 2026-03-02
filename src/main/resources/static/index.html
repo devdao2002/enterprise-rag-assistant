@@ -173,7 +173,6 @@
 
             if (data.sandbox.token) {
                 localStorage.setItem("sandboxToken", data.sandbox.token);
-                AppState.document.ready= JSON.parse(data.documentReady);
             }
 
             renderAll();
@@ -191,7 +190,7 @@
     function hydrateState(data) {
         Object.assign(AppState.version, data.version);
         Object.assign(AppState.sandbox, data.sandbox);
-        Object.assign(AppState.document, data.document);
+        Object.assign(AppState.document.ready = data.documentReady);
         Object.assign(AppState.limits, data.limits);
     }
 
@@ -460,8 +459,8 @@
                         if (obj.type === "sources") {
                             answerEl.innerText += "\nSource: " + obj.content;
                         }
-                        if (json.type === "done") {
-                            document.querySelectorAll(answerEl).forEach((block) => {
+                        if (obj.type === "done") {
+                            answerEl.querySelectorAll(answerEl).forEach((block) => {
                                 hljs.highlightElement(block);
                             });
                         }
