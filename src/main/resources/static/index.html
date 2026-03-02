@@ -3,38 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enterprise AI Assistant - Demo</title>
+    <title>LynorAI - Enterprise RAG Assistant</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
+
     <link rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/highlight.js/styles/github.min.css">
-
     <script src="https://cdn.jsdelivr.net/npm/highlight.js/lib/common.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 
 <body class="bg-gray-100 min-h-screen">
 
 <div class="max-w-6xl mx-auto p-4 md:p-8">
 
-    <!-- Header -->
+    <!-- HEADER -->
     <div class="mb-6 flex justify-between items-start">
-
         <div>
             <h1 class="text-2xl md:text-4xl font-bold">
-                Enterprise Internal AI Assistant
+                LynorAI Enterprise Assistant
             </h1>
-
             <div class="flex items-center gap-3 mt-2">
                 <p class="text-gray-600">
-                    Public Demo Sandbox
+                    Sandbox Demo
                 </p>
-
-                <span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-full">
+                <span class="text-xs bg-gray-200 px-2 py-1 rounded-full">
                     Built by Duc Do
                 </span>
             </div>
         </div>
 
-        <!-- Social -->
         <div class="flex gap-4">
             <!-- GitHub -->
             <a href="https://github.com/devdao2002/enterprise-rag-assistant"
@@ -66,30 +65,22 @@
         </div>
     </div>
 
-    <!-- Sandbox Info -->
+    <!-- SANDBOX -->
     <div id="sandboxInfo"
          class="bg-blue-100 border border-blue-400 text-blue-800 p-4 rounded mb-6 text-sm">
-        Initializing sandbox...
+        Initializing...
     </div>
 
-    <!-- Demo Notice -->
-    <div class="bg-yellow-100 border border-yellow-400 text-yellow-800 p-4 rounded mb-8 text-sm">
-        <strong>DEMO NOTICE:</strong><br/>
-        - Upload limit: 2 files per 10 minutes per IP<br/>
-        - Query limit: 20 requests per 10 minutes per IP<br/>
-        - Max file size: 5MB<br/>
-        - Only PDF files supported<br/>
-        - Documents auto-deleted after 4 hours<br/>
-        - Do NOT upload sensitive data
+    <!-- NOTICE -->
+    <div id="limitsNotice"
+         class="bg-yellow-100 border border-yellow-400 text-yellow-800 p-4 rounded mb-8 text-sm">
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-        <!-- Upload -->
+        <!-- UPLOAD -->
         <div class="bg-white p-6 rounded shadow">
-            <h2 class="text-xl font-semibold mb-4">
-                Upload Document
-            </h2>
+            <h2 class="text-xl font-semibold mb-4">Upload Document</h2>
 
             <input type="file"
                    id="fileInput"
@@ -98,7 +89,8 @@
 
             <button id="uploadBtn"
                     onclick="uploadFile()"
-                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full">
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full
+                           disabled:bg-gray-400 disabled:cursor-not-allowed">
                 Upload PDF
             </button>
 
@@ -106,32 +98,28 @@
                  class="mt-4 text-sm break-words"></div>
         </div>
 
-        <!-- Chat -->
+        <!-- CHAT -->
         <div class="bg-white p-6 rounded shadow flex flex-col">
-            <h2 class="text-xl font-semibold mb-4">
-                Ask Question
-            </h2>
+            <h2 class="text-xl font-semibold mb-4">Ask Question</h2>
 
             <textarea id="question"
                       class="border p-3 rounded w-full mb-4 flex-1"
-                      placeholder="Ask something based on uploaded documents..."></textarea>
+                      placeholder="Ask based on uploaded document..."></textarea>
 
             <button id="askBtn"
                     onclick="askQuestion()"
-                    class="bg-green-600 hover:bg-green-700
-                    disabled:bg-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-400
-                    text-white px-4 py-2 rounded w-full">
+                    class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded w-full
+                           disabled:bg-gray-400 disabled:cursor-not-allowed">
                 Ask AI
             </button>
 
             <div id="answer"
-                 class="mt-6 p-4 bg-gray-50 border rounded whitespace-pre-wrap text-sm">
+                 class="mt-6 p-4 bg-gray-50 border rounded text-sm overflow-auto">
             </div>
         </div>
-
     </div>
 
-    <!-- Footer -->
+    <!-- FOOTER -->
     <footer class="mt-16 border-t pt-6 text-center text-sm text-gray-500">
         © <span id="year"></span> Duc Do
         <div class="text-xs text-gray-400 mt-2" id="versionInfo">
@@ -143,13 +131,12 @@
 
 <script>
 
-    document.getElementById("year").innerText = new Date().getFullYear();
+    /* =====================================
+       GLOBAL APP STATE
+    ===================================== */
 
-    /* ================================
-       SaaS Sandbox State Machine
-    ================================ */
-
-    const appState = {
+    const AppState = {
+        version: {},
         sandbox: {
             token: null,
             active: false,
@@ -157,96 +144,169 @@
         },
         document: {
             ready: false
-        }
+        },
+        limits: {}
     };
 
-    function render() {
+    /* =====================================
+       BOOTSTRAP
+    ===================================== */
+
+    document.addEventListener("DOMContentLoaded", bootstrapApp);
+
+    async function bootstrapApp() {
+
+        document.getElementById("year").innerText =
+            new Date().getFullYear();
+
+        try {
+
+            const token = localStorage.getItem("sandboxToken");
+
+            const res = await fetch("/api/bootstrap", {
+                headers: token ? { "X-Sandbox-Token": token } : {}
+            });
+
+            const data = await res.json();
+
+            hydrateState(data);
+
+            if (data.sandbox.token) {
+                localStorage.setItem("sandboxToken", data.sandbox.token);
+            }
+
+            renderAll();
+            startCountdown();
+
+        } catch (e) {
+            showFatalError("Cannot initialize application.");
+        }
+    }
+
+    /* =====================================
+       STATE MANAGEMENT
+    ===================================== */
+
+    function hydrateState(data) {
+        Object.assign(AppState.version, data.version);
+        Object.assign(AppState.sandbox, data.sandbox);
+        Object.assign(AppState.document, data.document);
+        Object.assign(AppState.limits, data.limits);
+    }
+
+    /* =====================================
+       RENDER
+    ===================================== */
+
+    function renderAll() {
+        renderVersion();
+        renderSandbox();
+        renderLimits();
+        renderButtons();
+    }
+
+    function renderVersion() {
+        const el = document.getElementById("versionInfo");
+
+        el.innerHTML = `
+        Version ${AppState.version.version} •
+        <a href="${AppState.version.commitUrl}"
+           target="_blank"
+           class="underline hover:text-gray-600">
+           ${AppState.version.commitShort}
+        </a>
+    `;
+    }
+
+    function renderSandbox() {
+
+        const el = document.getElementById("sandboxInfo");
+
+        if (!AppState.sandbox.active) {
+            el.innerHTML =
+                `<span class="text-red-600">Sandbox inactive</span>`;
+            return;
+        }
+
+        el.innerHTML = `
+        <strong>Sandbox Active</strong><br/>
+        <div class="text-xs font-mono">${AppState.sandbox.token}</div>
+        <div>Expires in:
+            <span id="countdown">
+                ${formatTime(AppState.sandbox.remainingSeconds)}
+            </span>
+        </div>
+    `;
+    }
+
+    function renderLimits() {
+
+        document.getElementById("limitsNotice").innerHTML = `
+         <strong>DEMO NOTICE:</strong><br/>
+        - Upload limit: 2 files per 10 minutes per IP<br/>
+        - Query limit: 20 requests per 10 minutes per IP<br/>
+        - Max file size: 5MB<br/>
+        - Only PDF files supported<br/>
+        - Documents auto-deleted after 4 hours<br/>
+        - Do NOT upload sensitive data
+    `;
+    }
+
+    function renderButtons() {
 
         const uploadBtn = document.getElementById("uploadBtn");
         const askBtn = document.getElementById("askBtn");
 
-        if (!appState.sandbox.active) {
-            uploadBtn.disabled = true;
-            askBtn.disabled = true;
-            return;
-        }
-
-        uploadBtn.disabled = false;
-        askBtn.disabled = !appState.document.ready;
+        uploadBtn.disabled = !AppState.sandbox.active;
+        askBtn.disabled =
+            !AppState.sandbox.active ||
+            !AppState.document.ready;
     }
 
-    /* ================================
-       Sandbox Init
-    ================================ */
+    /* =====================================
+       COUNTDOWN
+    ===================================== */
 
-    async function initSandbox() {
+    function startCountdown() {
 
-        let token = localStorage.getItem("sandboxToken");
+        setInterval(() => {
 
-        if (token) {
+            if (!AppState.sandbox.active) return;
 
-            const res = await fetch("/api/sandbox/validate", {
-                headers: { "X-Sandbox-Token": token }
-            });
+            if (AppState.sandbox.remainingSeconds <= 0) {
 
-            if (res.ok) {
-                const data = await res.json();
-                activateSandbox(token, data.remainingMinutes);
-                await restoreDocumentState();
+                AppState.sandbox.active = false;
+                renderAll();
                 return;
             }
 
-            localStorage.removeItem("sandboxToken");
-        }
+            AppState.sandbox.remainingSeconds--;
 
-        const res = await fetch("/api/sandbox", { method: "POST" });
-        const data = await res.json();
+            const el = document.getElementById("countdown");
+            if (el) {
+                el.textContent =
+                    formatTime(AppState.sandbox.remainingSeconds);
+            }
 
-        token = data.sandboxToken;
-
-        localStorage.setItem("sandboxToken", token);
-        activateSandbox(token, data.remainingMinutes);
+        }, 1000);
     }
 
-    function activateSandbox(token, remainingMinutes) {
+    function formatTime(seconds) {
 
-        appState.sandbox.token = token;
-        appState.sandbox.active = true;
-        appState.sandbox.remainingSeconds = remainingMinutes * 60;
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
 
-        document.getElementById("sandboxInfo").innerHTML =
-            `<strong>Your private sandbox is active.</strong><br/>
-            <div>Sandbox ID: <span class="font-mono text-xs">${token}</span></div>
-            <div>Expires in:
-                <span id="countdown" class="font-mono text-xs text-blue-700">
-                     ${formatTime(appState.sandbox.remainingSeconds)}
-                </span></div>`;
-        startCountdown();
-        render();
+        return [
+            h.toString().padStart(2, '0'),
+            m.toString().padStart(2, '0'),
+            s.toString().padStart(2, '0')
+        ].join(':');
     }
 
-    /* ================================
-       Restore Document State
-    ================================ */
-
-    async function restoreDocumentState() {
-
-        const res = await fetch("/api/documents/exists", {
-            headers: { "X-Sandbox-Token": appState.sandbox.token }
-        });
-
-        if (!res.ok) return;
-
-        const data = await res.json();
-
-        appState.document.ready = data.hasDocument;
-
-        render();
-    }
-
-    /* ================================
-       Upload Flow
-    ================================ */
+    /* =====================================
+       UPLOAD
+    ===================================== */
 
     async function uploadFile() {
 
@@ -254,16 +314,12 @@
         const statusEl = document.getElementById("uploadStatus");
 
         if (!file) {
-            statusEl.innerText = "Please select a file.";
+            statusEl.innerText = "Select a file.";
             return;
         }
 
-        if (file.size > 5 * 1024 * 1024) {
-            statusEl.innerText = "File too large (max 5MB).";
-            return;
-        }
-
-        statusEl.innerHTML = `<span class="text-yellow-600">Uploading...</span>`;
+        statusEl.innerHTML =
+            `<span class="text-yellow-600">Uploading...</span>`;
 
         const formData = new FormData();
         formData.append("file", file);
@@ -271,13 +327,15 @@
         const res = await fetch("/api/documents/upload", {
             method: "POST",
             body: formData,
-            headers: { "X-Sandbox-Token": appState.sandbox.token }
+            headers: {
+                "X-Sandbox-Token": AppState.sandbox.token
+            }
         });
 
         if (!res.ok) {
-            const error = await res.json();
+            const err = await res.json();
             statusEl.innerHTML =
-                `<span class="text-red-600">${error.message}</span>`;
+                `<span class="text-red-600">${err.message}</span>`;
             return;
         }
 
@@ -292,9 +350,15 @@
 
         const interval = setInterval(async () => {
 
-            const res = await fetch(`/api/documents/status/${documentId}`, {
-                headers: { "X-Sandbox-Token": appState.sandbox.token }
-            });
+            const res = await fetch(
+                `/api/documents/status/${documentId}`,
+                {
+                    headers: {
+                        "X-Sandbox-Token":
+                        AppState.sandbox.token
+                    }
+                }
+            );
 
             if (!res.ok) {
                 clearInterval(interval);
@@ -302,13 +366,15 @@
             }
 
             const data = await res.json();
-            const statusEl = document.getElementById("uploadStatus");
+            const statusEl =
+                document.getElementById("uploadStatus");
 
             if (data.status === "READY") {
                 statusEl.innerHTML =
                     `<span class="text-green-600">Document ready ✅</span>`;
-                appState.document.ready = true;
-                render();
+
+                AppState.document.ready = true;
+                renderButtons();
                 clearInterval(interval);
             }
 
@@ -321,40 +387,43 @@
         }, 3000);
     }
 
-    /* ================================
-       Ask Flow
-    ================================ */
+    /* =====================================
+       ASK (SSE STREAM)
+    ===================================== */
 
     async function askQuestion() {
 
-        const question = document.getElementById("question").value;
-        const answerEl = document.getElementById("answer");
-        const askBtn = document.getElementById("askBtn");
+        const question =
+            document.getElementById("question").value;
 
-        if (!question.trim()) {
-            answerEl.innerText = "Please enter a question.";
-            return;
-        }
+        const answerEl =
+            document.getElementById("answer");
+
+        const askBtn =
+            document.getElementById("askBtn");
+
+        if (!question.trim()) return;
+
         answerEl.innerHTML =
             `<span class="text-gray-500">Thinking...</span>`;
-        askBtn.disabled=true;
+
+        askBtn.disabled = true;
 
         const response = await fetch(
             `/api/ask/stream?question=${encodeURIComponent(question)}`,
             {
                 headers: {
-                    "X-Sandbox-Token": appState.sandbox.token
+                    "X-Sandbox-Token":
+                    AppState.sandbox.token
                 }
             }
         );
 
         if (!response.ok) {
-            const error = await response.json();
-            answerEl.innerHTML = "";
-            const span = document.createElement("span");
-            span.className = "text-red-600";
-            span.textContent = error.message.trim();
-            answerEl.appendChild(span);
+            const err = await response.json();
+            answerEl.innerHTML =
+                `<span class="text-red-600">${err.message}</span>`;
+            askBtn.disabled = false;
             return;
         }
 
@@ -362,129 +431,78 @@
         const decoder = new TextDecoder();
 
         let buffer = "";
-        answerEl.innerHTML="";
+        let fullText = "";
+
+        answerEl.innerHTML = "";
+
         while (true) {
-            const { done, value } = await reader.read();
+
+            const { done, value } =
+                await reader.read();
+
             if (done) break;
 
             buffer += decoder.decode(value, { stream: true });
 
-            let newlineIndex;
-            while ((newlineIndex = buffer.indexOf(`\n\n`)) >= 0) {
-                let chunk = buffer.slice(0, newlineIndex).trim();
-                buffer = buffer.slice(newlineIndex + 2);
+            let boundary;
+            while ((boundary = buffer.indexOf("\n\n")) >= 0) {
 
-                if (chunk.startsWith("data:")) {
-                    const jsonStr = chunk.replace("data:", "").trim();
-                    if (!jsonStr) continue;
+                let chunk =
+                    buffer.slice(0, boundary).trim();
 
-                    try {
-                        const obj = JSON.parse(jsonStr);
+                buffer =
+                    buffer.slice(boundary + 2);
 
-                        if (obj.type === "token") {
-                            answerEl.innerText += obj.content;
-                        }
+                if (!chunk.startsWith("data:")) continue;
 
-                        if (obj.type === "sources") {
-                            answerEl.innerText += "\n\nSource: " + obj.content;
-                        }
+                const jsonStr =
+                    chunk.replace("data:", "").trim();
 
-                        if (json.type === "done") {
-                            document.querySelectorAll(answerEl).forEach((block) => {
-                                hljs.highlightElement(block);
-                            });
-                        }
-                    } catch (e) {
-                        console.error("Error parsing chunk", e, chunk);
-                    }
-                    // Auto-scroll inside chat
-                    answerEl.scrollTop = answerEl.scrollHeight;
+                if (!jsonStr) continue;
+
+                const obj = JSON.parse(jsonStr);
+
+                if (obj.type === "token") {
+                    fullText += obj.content;
+                    answerEl.innerHTML =
+                        marked.parse(fullText);
                 }
+
+                if (obj.type === "sources") {
+                    fullText += "\n\nSources:\n" + obj.content;
+                    answerEl.innerHTML =
+                        marked.parse(fullText);
+                }
+
+                if (obj.type === "done") {
+                    document
+                        .querySelectorAll("pre code")
+                        .forEach(block =>
+                            hljs.highlightElement(block)
+                        );
+                }
+
+                answerEl.scrollTop =
+                    answerEl.scrollHeight;
             }
         }
-        askBtn.disabled=false;
+
+        askBtn.disabled = false;
     }
 
-    function formatTime(seconds) {
+    /* =====================================
+       UTIL
+    ===================================== */
 
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        const secs = seconds % 60;
-
-        return [
-            hours.toString().padStart(2, '0'),
-            minutes.toString().padStart(2, '0'),
-            secs.toString().padStart(2, '0')
-        ].join(':');
+    function showFatalError(msg) {
+        document.body.innerHTML =
+            `<div class="flex items-center justify-center h-screen">
+            <div class="bg-red-100 border border-red-400
+                        text-red-700 p-6 rounded">
+                ${msg}
+            </div>
+        </div>`;
     }
-
-    function startCountdown() {
-
-        const interval = setInterval(() => {
-
-            if (!appState.sandbox.active) {
-                clearInterval(interval);
-                return;
-            }
-
-            if (appState.sandbox.remainingSeconds <= 0) {
-
-                document.getElementById("countdown").innerText = "00:00:00";
-
-                appState.sandbox.active = false;
-                disableAll();
-
-                clearInterval(interval);
-                return;
-            }
-
-            appState.sandbox.remainingSeconds--;
-
-            document.getElementById("countdown").innerText =
-                formatTime(appState.sandbox.remainingSeconds);
-
-        }, 1000);
-    }
-
-    function disableAll() {
-
-        document
-            .querySelector("button[onclick='uploadFile()']")
-            .disabled = true;
-
-        document
-            .querySelector("button[onclick='askQuestion()']")
-            .disabled = true;
-    }
-
-    async function loadVersion() {
-
-        try {
-
-            const res = await fetch("/api/version");
-            const data = await res.json();
-
-            document.getElementById("versionInfo").innerHTML = `
-            Version ${data.version} •
-            <a href="${data.commitUrl}"
-               target="_blank"
-               class="underline hover:text-gray-600">
-               ${data.commitShort}
-            </a>
-        `;
-
-        } catch (e) {
-            console.warn("Cannot load version info");
-        }
-    }
-
-    document.addEventListener("DOMContentLoaded", loadVersion);
-
-    /* ================================
-       Boot
-    ================================ */
-
-    window.onload = initSandbox;
 
 </script>
 

@@ -24,6 +24,7 @@ public class SandboxFilter extends OncePerRequestFilter {
     private final SandboxService sandboxService;
     private final ErrorResponseWriter errorWriter;
     private static final List<String> EXCLUDED_PATHS = List.of(
+            "/api/bootstrap",
             "/api/version",
             "/api/sandbox",
             "/api/sandbox/validate"

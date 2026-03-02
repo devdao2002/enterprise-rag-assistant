@@ -35,6 +35,13 @@ public class IngestionService {
     private static final int CHUNK_OVERLAP = 200;
     private static final int EMBEDDING_BATCH_SIZE = 50;
 
+    public boolean hasReadyDocument(UUID tenantId) {
+        return documentRepository.existsByTenantIdAndStatus(
+                tenantId,
+                "READY"
+        );
+    }
+
     /**
      * Create document record and return immediately
      */
