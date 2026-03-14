@@ -1,19 +1,27 @@
-# LynorAI - Enterprise RAG Assistant
-
+<h1 align="center"> LynorAI - Enterprise RAG Assistant </h1>
+<p align="center">
 Spring Boot RAG application for PDF Q&A with sandbox isolation, vector search (pgvector), and OpenAI models.
-
-````
+</p>
+<p align="center">
+  <a href="https://lynorai.space">
+    <img src="https://img.shields.io/badge/Demo-Web-brightgreen"/>
+  </a>
+  <a href="https://github.com/devdao2002/LynorAI-mobile/releases/latest">
+    <img src="https://img.shields.io/github/v/release/devdao2002/LynorAI-mobile?label=Android%20App"/>
+  </a>
+  
+</p>
+<div align="center">
+<pre>
 ██╗      ██╗   ██╗███╗   ██╗ ██████╗ ██████╗  █████╗ ██╗
 ██║       ╚██╗ ██╔╝████╗  ██║██╔═══██╗██╔══██╗██╔══██╗██║
 ██║        ╚████╔╝ ██╔██╗ ██║██║   ██║██████╔╝███████║██║
 ██║         ╚██╔╝  ██║╚██╗██║██║   ██║██╔══██╗██╔══██║██║
 ███████╗     ██║   ██║ ╚████║╚██████╔╝██║  ██║██║  ██║██║
 ╚══════╝     ╚═╝   ╚═╝  ╚═══╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝
-````
+</pre>
+</div>
 
-![Demo Status](https://img.shields.io/badge/Demo-Live-green)
-
-> You can try the live demo version **(v0.0.1)** here: **https://lynorai.space/index.html**
 ## Current Status
 
 Implemented and aligned in code:
